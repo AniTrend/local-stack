@@ -1,0 +1,29 @@
+version: '3'
+
+services:
+  redis:
+    container_name: "redis"
+    image: redis:4.0-alpine
+    networks:
+      - default
+    ports:
+    - 6379:6379
+    command: redis-server --appendonly yes
+    env_file: .env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.redis.rule=HostSNI(`redis.docker.localhost`)"
+      - "traefik.tcp.routers.redis.entrypoints=websecure"
+      - "traefik.tcp.routers.redis.service=redis"
+      - "traefik.tcp.routers.redis.tls=true"
+      #- "traefik.tcp.routers.redis.tls.certresolver=staging"
+      - "traefik.tcp.services.redis.loadbalancer.server.port=6379"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true

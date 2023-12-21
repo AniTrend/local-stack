@@ -1,0 +1,41 @@
+version: '3'
+services:
+  django-server:
+    image: ghcr.io/anitrend/anitrend:latest
+    command: 
+      - /usr/src/start-server.sh
+    container_name: django-server
+    networks:
+      - default
+    env_file: .env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.anitrend.rule=Host(`anitrend.docker.localhost`)"
+      - "traefik.http.routers.anitrend.entrypoints=web,websecure"
+      - "traefik.http.middlewares.anitrend.addprefix.prefix=/graphql"
+      - "traefik.http.routers.anitrend.service=anitrend"
+      - "traefik.http.routers.anitrend.tls=true"
+      - "traefik.http.routers.anitrend.tls.certresolver=staging"
+      - "traefik.http.services.anitrend.loadbalancer.server.port=8800"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  django-q:
+    image: ghcr.io/anitrend/anitrend:latest
+    command: 
+      - /usr/src/start-q.sh
+    container_name: django-q
+    networks:
+      - default
+    env_file: .env
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true

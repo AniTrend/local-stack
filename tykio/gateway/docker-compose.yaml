@@ -1,0 +1,34 @@
+version: "3"
+
+services:
+  tyk_gateway:
+    container_name: "tykio-gateway"
+    image: tykio/tyk-gateway:v5.2.2
+    networks:
+      - default
+    ports:
+      - 9000:9000
+    env_file:
+      - .env
+    volumes:
+      - ./config/tyk.conf:/opt/tyk-gateway/tyk.conf
+      - ./middleware:/opt/tyk-gateway/middleware
+      - ./policies:/opt/tyk-gateway/policies
+      - ./apps:/opt/tyk-gateway/apps
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tyk-gateway.rule=Host(`tyk-api.docker.localhost`)"
+      - "traefik.http.routers.tyk-gateway.entrypoints=websecure"
+      - "traefik.http.routers.tyk-gateway.service=tyk-gateway"
+      - "traefik.http.routers.tyk-gateway.tls=true"
+      #- "traefik.http.routers.tyk-gateway.tls.certresolver=staging"
+      - "traefik.http.services.tyk-gateway.loadbalancer.server.port=9000"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true

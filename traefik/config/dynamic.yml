@@ -1,0 +1,15 @@
+# tls:
+#   stores:
+#     default:
+#       defaultCertificate:
+#         certFile: /ssl-certs/localhost.crt
+#         keyFile: /ssl-certs/localhost.key
+#     domains:
+#       - main: docker.localhost
+#         sans:
+#           - *.docker.localhost
+
+tls:
+  certificates:
+    - certFile: "/ssl-certs/localhost.crt"
+      keyFile: "/ssl-certs/localhost.key"

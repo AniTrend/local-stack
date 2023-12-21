@@ -1,0 +1,33 @@
+version: "3"
+services:
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:10.2.0
+    volumes:
+      - ./data:/var/lib/grafana
+      - ./config/provisioning/:/etc/grafana/provisioning/
+    env_file: .env
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.docker.localhost`)"
+      - "traefik.http.routers.grafana.entrypoints=web,websecure"
+      - "traefik.http.routers.grafana.service=grafana"
+      - "traefik.http.routers.grafana.tls=true"
+      #- "traefik.http.routers.grafana.tls.certresolver=staging"
+      - "traefik.http.routers.grafana-ui.middlewares=sso"
+      - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
+      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"
+      - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    networks:
+      - default
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true

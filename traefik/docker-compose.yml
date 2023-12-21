@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  traefik:
+    container_name: "traefik"
+    image: traefik:v3.0
+    networks:
+      - default
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./config/traefik.yml:/etc/traefik/traefik.yml
+      - ./config/dynamic.yml:/etc/traefik/dynamic.yml
+      - ./logs:/var/log/traefik/
+      - ./ssl-certs:/ssl-certs
+      - ./auth/htpasswd:/etc/htpasswd:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-ui.rule=Host(`traefik.docker.localhost`)"
+      - "traefik.http.routers.traefik-ui.entrypoints=web,websecure"
+      - "traefik.http.routers.traefik-ui.tls=true"
+      # - "traefik.http.routers.traefik-ui.tls.certresolver=staging"
+      - "traefik.http.routers.traefik-ui.service=api@internal"
+      - "traefik.http.routers.traefik-ui.middlewares=sso"
+      - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
+      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"
+      - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
+      - "traefik.http.services.traefik-ui.loadbalancer.server.port=8080"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true
