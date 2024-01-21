@@ -13,16 +13,16 @@ services:
       - ./data:/prometheus
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.prometheus.rule=Host(`prometheus.docker.localhost`)"
+      - "traefik.http.routers.prometheus.rule=Host(`${HOST}`)"
       - "traefik.http.routers.prometheus.entrypoints=web,websecure"
       - "traefik.http.routers.prometheus.service=prometheus"
       - "traefik.http.routers.prometheus.tls=true"
-      #- "traefik.http.routers.prometheus.tls.certresolver=staging"
+      - "traefik.http.routers.prometheus.tls.certresolver=staging"
       - "traefik.http.routers.prometheus.middlewares=sso"
       - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
       - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"
       - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
-      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=${PORT}"
     networks:
       - default
     restart: unless-stopped

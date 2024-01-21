@@ -10,13 +10,13 @@ services:
     env_file: .env
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.anitrend.rule=Host(`anitrend.docker.localhost`)"
+      - "traefik.http.routers.anitrend.rule=Host(`${HOST}`)"
       - "traefik.http.routers.anitrend.entrypoints=web,websecure"
       - "traefik.http.middlewares.anitrend.addprefix.prefix=/graphql"
       - "traefik.http.routers.anitrend.service=anitrend"
       - "traefik.http.routers.anitrend.tls=true"
       - "traefik.http.routers.anitrend.tls.certresolver=staging"
-      - "traefik.http.services.anitrend.loadbalancer.server.port=8800"
+      - "traefik.http.services.anitrend.loadbalancer.server.port=${PORT}"
     logging:
       options:
         max-size: "10m"

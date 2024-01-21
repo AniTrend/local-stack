@@ -17,12 +17,12 @@ services:
       - ./apps:/opt/tyk-gateway/apps
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tyk-gateway.rule=Host(`tyk-api.docker.localhost`)"
+      - "traefik.http.routers.tyk-gateway.rule=Host(`${HOST}`)"
       - "traefik.http.routers.tyk-gateway.entrypoints=websecure"
       - "traefik.http.routers.tyk-gateway.service=tyk-gateway"
       - "traefik.http.routers.tyk-gateway.tls=true"
-      #- "traefik.http.routers.tyk-gateway.tls.certresolver=staging"
-      - "traefik.http.services.tyk-gateway.loadbalancer.server.port=9000"
+      - "traefik.http.routers.tyk-gateway.tls.certresolver=staging"
+      - "traefik.http.services.tyk-gateway.loadbalancer.server.port=${PORT}"
     logging:
       options:
         max-size: "10m"

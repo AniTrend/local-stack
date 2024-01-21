@@ -1,0 +1,110 @@
+{
+  "$schema": "https://www.krakend.io/schema/v3.json",
+  "version": 3,
+  "name": "KrakenD - API Gateway",
+  "timeout": "3000ms",
+  "cache_ttl": "300s",
+  "endpoints": [
+    {
+      "endpoint": "/v1/news",
+      "method": "GET",
+      "output_encoding": "json",
+      "backend": [
+        {
+          "url_pattern": "/news",
+          "encoding": "json",
+          "sd": "static",
+          "method": "GET",
+          "disable_host_sanitize": false,
+          "extra_config": {
+            "qos/ratelimit/proxy": {
+              "max_rate": 1,
+              "capacity": 1,
+              "every": "1s"
+            },
+            "qos/circuit-breaker": {
+              "interval": 60,
+              "name": "circuit-breaker-1",
+              "timeout": 10,
+              "max_errors": 1,
+              "log_status_change": true
+            }
+          },
+          "host": [
+            "172.19.0.8:9800"
+          ]
+        }
+      ],
+      "extra_config": {
+        "qos/ratelimit/router": {
+          "max_rate": 15,
+          "client_max_rate": 0,
+          "strategy": "ip",
+          "capacity": 0,
+          "client_capacity": 0
+        }
+      },
+      "timeout": "5s",
+      "cache_ttl": "15m"
+    },
+    {
+      "endpoint": "/v1/series",
+      "method": "GET",
+      "output_encoding": "json",
+      "backend": [
+        {
+          "url_pattern": "/series",
+          "encoding": "json",
+          "sd": "static",
+          "method": "GET",
+          "disable_host_sanitize": false,
+          "extra_config": {
+            "qos/http-cache": {
+              "shared": true
+            }
+          },
+          "host": [
+            "172.19.0.8:9800"
+          ]
+        }
+      ],
+      "cache_ttl": "5m",
+      "timeout": "1m",
+      "input_query_strings": [
+        "id"
+      ]
+    },
+    {
+      "endpoint": "/v1/config",
+      "method": "GET",
+      "output_encoding": "json",
+      "backend": [
+        {
+          "url_pattern": "/config",
+          "encoding": "json",
+          "sd": "static",
+          "method": "GET",
+          "disable_host_sanitize": false,
+          "extra_config": {
+            "qos/http-cache": {
+              "shared": true
+            }
+          },
+          "host": [
+            "172.19.0.8:9800"
+          ]
+        }
+      ],
+      "cache_ttl": "15m",
+      "timeout": "5s"
+    }
+  ],
+  "output_encoding": "json",
+  "debug_endpoint": true,
+  "echo_endpoint": true,
+  "port": null,
+  "read_timeout": "2m",
+  "write_timeout": "30s",
+  "read_header_timeout": "15s",
+  "idle_timeout": "15s"
+}

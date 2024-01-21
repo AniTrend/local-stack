@@ -7,7 +7,7 @@ services:
     networks:
       - default
     ports:
-    - 6379:6379
+    - ${PORT}:${PORT}
     command: redis-server --appendonly yes
     env_file: .env
     labels:
@@ -16,8 +16,8 @@ services:
       - "traefik.tcp.routers.redis.entrypoints=websecure"
       - "traefik.tcp.routers.redis.service=redis"
       - "traefik.tcp.routers.redis.tls=true"
-      #- "traefik.tcp.routers.redis.tls.certresolver=staging"
-      - "traefik.tcp.services.redis.loadbalancer.server.port=6379"
+      - "traefik.tcp.routers.redis.tls.certresolver=staging"
+      - "traefik.tcp.services.redis.loadbalancer.server.port=${PORT}"
     logging:
       options:
         max-size: "10m"

@@ -7,19 +7,19 @@ services:
     networks:
       - default
     ports:
-      - 27017:27017
+      - ${PORT}:${PORT}
     env_file:
       - .env
     volumes:
       - ./data/db:/data/db
     labels:
       - "traefik.enable=true"
-      - "traefik.tcp.routers.mongo.rule=HostSNI(`mongo.docker.localhost`)"
+      - "traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)"
       - "traefik.tcp.routers.mongo.entrypoints=websecure"
       - "traefik.tcp.routers.mongo.service=mongo"
       - "traefik.tcp.routers.mongo.tls=true"
-      #- "traefik.tcp.routers.mongo.tls.certresolver=staging"
-      - "traefik.tcp.services.mongo.loadbalancer.server.port=27017"
+      - "traefik.tcp.routers.mongo.tls.certresolver=staging"
+      - "traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}"
 
 networks:
   default:

@@ -7,17 +7,18 @@ services:
     networks:
       - default
     ports: 
-      - 3000:3000
+      - ${PORT}:${PORT}
+    env_file: .env
     volumes:
       - ./config/tyk.conf:/opt/tyk-gateway/tyk.conf
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tyk-dashboard.rule=Host(`tykio.docker.localhost`)"
+      - "traefik.http.routers.tyk-dashboard.rule=Host(`${HOST}`)"
       - "traefik.http.routers.tyk-dashboard.entrypoints=websecure"
       - "traefik.http.routers.tyk-dashboard.service=tyk-dashboard"
       - "traefik.http.routers.tyk-dashboard.tls=true"
-      #- "traefik.http.routers.tyk-dashboard.tls.certresolver=staging"
-      - "traefik.http.services.tyk-dashboard.loadbalancer.server.port=3000"
+      - "traefik.http.routers.tyk-dashboard.tls.certresolver=staging"
+      - "traefik.http.services.tyk-dashboard.loadbalancer.server.port=${PORT}"
     logging:
       options:
         max-size: "10m"

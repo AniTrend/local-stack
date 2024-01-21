@@ -1,21 +1,21 @@
 version: '3'
 services:
   anitrend-edge:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/anitrend/on-the-edge:0.1.1
     container_name: anitrend-edge
     networks:
       - default
     env_file: .env
+    ports: 
+      - ${PORT}:${PORT}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.anitrend-edge.rule=Host(`edge.docker.localhost`)"
+      - "traefik.http.routers.anitrend-edge.rule=Host(`${HOST}`)"
       - "traefik.http.routers.anitrend-edge.entrypoints=web,websecure"
       - "traefik.http.routers.anitrend-edge.service=anitrend-edge"
       - "traefik.http.routers.anitrend-edge.tls=true"
       - "traefik.http.routers.anitrend-edge.tls.certresolver=staging"
-      - "traefik.http.services.anitrend-edge.loadbalancer.server.port=9800"
+      - "traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}"
 
 networks:
   default:

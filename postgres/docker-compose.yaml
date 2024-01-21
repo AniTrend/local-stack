@@ -11,12 +11,12 @@ services:
       env_file: .env
       labels:
         - "traefik.enable=true"
-        - "traefik.tcp.routers.postgres.rule=HostSNI(`postgres.docker.localhost`)"
+        - "traefik.tcp.routers.postgres.rule=HostSNI(`${HOST}`)"
         - "traefik.tcp.routers.postgres.entrypoints=websecure"
         - "traefik.tcp.routers.postgres.service=postgres"
         - "traefik.tcp.routers.postgres.tls=true"
-        #- "traefik.tcp.routers.postgres.tls.certresolver=staging"
-        - "traefik.tcp.services.postgres.loadbalancer.server.port=5432"
+        - "traefik.tcp.routers.postgres.tls.certresolver=staging"
+        - "traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}"
       logging:
         options:
           max-size: "10m"

@@ -1,15 +1,35 @@
-# tls:
-#   stores:
-#     default:
-#       defaultCertificate:
-#         certFile: /ssl-certs/localhost.crt
-#         keyFile: /ssl-certs/localhost.key
+# http:
+#   routers:
+#     traefik-ui:
+#       entryPoints:
+#         - web
+#         - websecure
+#       rule: "Host(`traefik.docker.localhost`)"
+#       service: "api@internal"
+#       middlewares:
+#         - "sso"
+# 
+#   middlewares:
+#     sso:
+#       plugin:
+#         trauth:
+#           domain: "docker.localhost"
+#           cookiename: "sso-cookie"
+#           users: "${SSO_CREDENTIALS}"
+# 
+#   services:
+#     traefik-ui:
+#       loadBalancer:
+#         server:
+#           port: 8080
+# 
+#   tls:
 #     domains:
-#       - main: docker.localhost
+#       - main: "docker.localhost"
 #         sans:
-#           - *.docker.localhost
-
-tls:
-  certificates:
-    - certFile: "/ssl-certs/localhost.crt"
-      keyFile: "/ssl-certs/localhost.key"
+#           - "*.docker.localhost"
+# 
+# tls:
+#   certificates:
+#     - certFile: "/ssl-certs/localhost.crt"
+#       keyFile: "/ssl-certs/localhost.key"

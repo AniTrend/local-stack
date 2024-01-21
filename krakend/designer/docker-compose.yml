@@ -1,0 +1,30 @@
+version: "3"
+
+services:
+  krakend-designer:
+    container_name: "krakend-designer"
+    image: krakend/designer:2.4
+    networks:
+      - default
+    env_file: .env
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.designer.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.designer.entrypoints=web,websecure"
+      - "traefik.http.routers.designer.service=designer"
+      - "traefik.http.routers.designer.tls=true"
+      - "traefik.http.routers.designer.tls.certresolver=staging"
+      - "traefik.http.services.designer.loadbalancer.server.port=${PORT}"
+      - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
+      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"
+      - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true

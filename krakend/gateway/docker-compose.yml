@@ -1,0 +1,31 @@
+version: "3"
+
+services:
+  krakend-ce:
+    container_name: "krakend-ce"
+    image: devopsfaith/krakend:2.5
+    networks:
+      - default
+    env_file:
+      - .env
+    volumes:
+      - ./config/:/etc/krakend
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.krakend.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.krakend.entrypoints=web,websecure"
+      - "traefik.http.routers.krakend.service=krakend"
+      - "traefik.http.routers.krakend.tls=true"
+      - "traefik.http.routers.krakend.tls.certresolver=staging"
+      - "traefik.http.services.krakend.loadbalancer.server.port=${PORT}"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+networks:
+  default:
+    name: traefik
+    external: true
