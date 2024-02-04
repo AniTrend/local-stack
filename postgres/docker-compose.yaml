@@ -7,7 +7,7 @@ services:
       networks:
         - default
       ports:
-        - 5432:5432
+        - ${PORT}:${PORT}
       env_file: .env
       labels:
         - "traefik.enable=true"
