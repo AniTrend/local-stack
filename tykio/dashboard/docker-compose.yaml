@@ -3,7 +3,7 @@ version: "3"
 services:
   tyk_dashboard:
     container_name: "tykio-dashboard"
-    image: tykio/tyk-dashboard:v5.0
+    image: tykio/tyk-dashboard:v5.2
     networks:
       - default
     ports: 
