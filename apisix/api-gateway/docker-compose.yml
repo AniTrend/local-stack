@@ -1,0 +1,31 @@
+version: "3"
+services:
+  apisix_gateway:
+    container_name: "apisix-gateway"
+    image: apache/apisix:3.8.0-debian
+    networks:
+      - default
+    env_file:
+      - .env
+    volumes:
+      - ./config/apisix.yaml:/usr/local/apisix/conf/apisix.yaml:ro
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apisix.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.apisix.entrypoints=web,websecure"
+      - "traefik.http.routers.apisix.service=apisix"
+      - "traefik.http.routers.apisix.tls=true"
+      - "traefik.http.routers.apisix.tls.certresolver=staging"
+      - "traefik.http.services.apisix.loadbalancer.server.port=${PORT}"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+networks:
+  default:
+    name: traefik
+    external: true
+    

@@ -1,0 +1,31 @@
+version: "3"
+services:
+  apisix_dashboard:
+    container_name: "apisix-dashobard"
+    image: apache/apisix-dashboard:3.0.1-alpine
+    networks:
+      - default
+    env_file:
+      - .env
+    volumes:
+      - ./config/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.apisix-dashboard.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.apisix-dashboard.entrypoints=web,websecure"
+      - "traefik.http.routers.apisix-dashboard.service=apisix-dashboard"
+      - "traefik.http.routers.apisix-dashboard.tls=true"
+      - "traefik.http.routers.apisix-dashboard.tls.certresolver=staging"
+      - "traefik.http.services.apisix-dashboard.loadbalancer.server.port=${PORT}"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+networks:
+  default:
+    name: traefik
+    external: true
+    
