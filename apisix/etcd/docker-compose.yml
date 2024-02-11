@@ -2,7 +2,7 @@ version: "3"
 services:
   etcd:
     container_name: "apisix-etcd"
-    image: bitnami/etcd:3.5.11
+    image: bitnami/etcd:3.5.12
     networks:
       - default
     env_file: 
