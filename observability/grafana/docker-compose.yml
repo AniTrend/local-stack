@@ -14,7 +14,6 @@ services:
       - "traefik.http.routers.grafana.service=grafana"
       - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.routers.grafana.tls.certresolver=staging"
-      - "traefik.http.routers.grafana-ui.middlewares=sso"
       - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
       - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"
       - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
