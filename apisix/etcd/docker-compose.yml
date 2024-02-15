@@ -8,7 +8,7 @@ services:
     env_file: 
       - .env
     volumes:
-      - ./config:/bitnami/etcd
+      - ./data:/bitnami/etcd
     ports:
       - "${PORT}:${PORT}/tcp"
     restart: unless-stopped

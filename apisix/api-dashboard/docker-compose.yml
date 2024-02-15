@@ -9,6 +9,8 @@ services:
       - .env
     volumes:
       - ./config/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    ports:
+      - ${PORT}:9000
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
