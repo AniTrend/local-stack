@@ -69,15 +69,6 @@ metrics:
 
 experimental:
   plugins:
-    plugin-simplecache:
-      moduleName: "github.com/traefik/plugin-simplecache"
-      version: "v0.2.1"
     trauth:
       moduleName: "github.com/leonjza/trauth"
-      version: "v1.4.3"
-    traefik-container-manager:
-      moduleName: "github.com/adyanth/traefik-container-manager"
-      version: "v0.1.2"
-    staticresponse:
-      moduleName: "github.com/jdel/staticresponse"
-      version: "v0.0.1"
+      version: "v1.5.1"
