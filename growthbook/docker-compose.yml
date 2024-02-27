@@ -2,7 +2,7 @@ version: '3'
 
 services:
   growthbook:
-    image: "growthbook/growthbook:2.7.1"
+    image: "growthbook/growthbook:2.8.0"
     container_name: growthbook
     volumes:
       - ./data/uploads:/usr/local/src/app/packages/back-end/uploads
