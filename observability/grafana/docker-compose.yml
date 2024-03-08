@@ -2,7 +2,7 @@ version: "3"
 services:
   grafana:
     container_name: grafana
-    image: grafana/grafana:10.3.3
+    image: grafana/grafana:10.4.0
     volumes:
       - ./data:/var/lib/grafana
       - ./config/provisioning/:/etc/grafana/provisioning/
