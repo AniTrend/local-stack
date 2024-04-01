@@ -2,7 +2,7 @@ version: "3"
 services:
   apisix_gateway:
     container_name: "apisix-gateway"
-    image: apache/apisix:3.8.0-debian
+    image: apache/apisix:3.9.0-debian
     networks:
       - default
     env_file:
