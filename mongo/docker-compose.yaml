@@ -3,7 +3,7 @@ version: '3'
 services:
   mongo:
     container_name: "mongo"
-    image: mongo:7.0.7
+    image: mongo:7.0.8
     networks:
       - default
     ports:
