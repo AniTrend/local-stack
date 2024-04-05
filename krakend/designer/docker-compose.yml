@@ -16,8 +16,8 @@ services:
       - "traefik.http.routers.designer.tls=true"
       - "traefik.http.routers.designer.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.designer.loadbalancer.server.port=${PORT}"
-      - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
-      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"
+      - "traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}"
+      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}"
       - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
     logging:
       options:

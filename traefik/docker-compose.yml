@@ -25,16 +25,12 @@ services:
       - "traefik.http.routers.traefik-ui.tls=true"
       - "traefik.http.routers.traefik-ui.service=api@internal"
       - "traefik.http.routers.traefik-ui.middlewares=sso"
-      - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
-      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"
+      - "traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}"
+      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}"
       - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
       - "traefik.http.services.traefik-ui.loadbalancer.server.port=${PORT}"
-      - "traefik.http.routers.traefik-ui.tls.domains[0].main=docker.localhost"
-      - "traefik.http.routers.traefik-ui.tls.domains[0].sans=*.docker.localhost"
       - "traefik.tls.enable=true"
       - "traefik.tls.certresolver=${CERT_RESOLVER}"
-      - "traefik.tls.certificates[0].certFile=/ssl-certs/localhost.crt"
-      - "traefik.tls.certificates[0].keyFile=/ssl-certs/localhost.key"
     logging:
       options:
         max-size: "10m"
