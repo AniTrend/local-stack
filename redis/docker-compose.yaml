@@ -16,7 +16,7 @@ services:
       - "traefik.tcp.routers.redis.entrypoints=websecure"
       - "traefik.tcp.routers.redis.service=redis"
       - "traefik.tcp.routers.redis.tls=true"
-      - "traefik.tcp.routers.redis.tls.certresolver=staging"
+      - "traefik.tcp.routers.redis.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.tcp.services.redis.loadbalancer.server.port=${PORT}"
     logging:
       options:

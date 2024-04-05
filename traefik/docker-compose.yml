@@ -32,7 +32,7 @@ services:
       - "traefik.http.routers.traefik-ui.tls.domains[0].main=docker.localhost"
       - "traefik.http.routers.traefik-ui.tls.domains[0].sans=*.docker.localhost"
       - "traefik.tls.enable=true"
-      - "traefik.tls.certresolver=staging"
+      - "traefik.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.tls.certificates[0].certFile=/ssl-certs/localhost.crt"
       - "traefik.tls.certificates[0].keyFile=/ssl-certs/localhost.key"
     logging:

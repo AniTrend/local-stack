@@ -15,7 +15,7 @@ services:
         - "traefik.tcp.routers.postgres.entrypoints=websecure"
         - "traefik.tcp.routers.postgres.service=postgres"
         - "traefik.tcp.routers.postgres.tls=true"
-        - "traefik.tcp.routers.postgres.tls.certresolver=staging"
+        - "traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}"
         - "traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}"
       logging:
         options:

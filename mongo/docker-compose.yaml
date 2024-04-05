@@ -18,7 +18,7 @@ services:
       - "traefik.tcp.routers.mongo.entrypoints=websecure"
       - "traefik.tcp.routers.mongo.service=mongo"
       - "traefik.tcp.routers.mongo.tls=true"
-      - "traefik.tcp.routers.mongo.tls.certresolver=staging"
+      - "traefik.tcp.routers.mongo.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}"
 
 networks:

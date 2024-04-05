@@ -14,7 +14,7 @@ services:
       - "traefik.http.routers.anitrend-graphql.entrypoints=web,websecure"
       - "traefik.http.routers.anitrend-graphql.service=anitrend-graphql"
       - "traefik.http.routers.anitrend-graphql.tls=true"
-      - "traefik.http.routers.anitrend-graphql.tls.certresolver=staging"
+      - "traefik.http.routers.anitrend-graphql.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.anitrend-graphql.loadbalancer.server.port=${PORT}"
     logging:
       options:

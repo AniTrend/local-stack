@@ -17,7 +17,7 @@ services:
       - "traefik.http.routers.prometheus.entrypoints=web,websecure"
       - "traefik.http.routers.prometheus.service=prometheus"
       - "traefik.http.routers.prometheus.tls=true"
-      - "traefik.http.routers.prometheus.tls.certresolver=staging"
+      - "traefik.http.routers.prometheus.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.routers.prometheus.middlewares=sso"
       - "traefik.http.middlewares.sso.plugin.trauth.domain=docker.localhost"
       - "traefik.http.middlewares.sso.plugin.trauth.cookiename=sso-cookie"

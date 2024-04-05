@@ -17,7 +17,7 @@ services:
       - "traefik.http.routers.krakend.entrypoints=web,websecure"
       - "traefik.http.routers.krakend.service=krakend"
       - "traefik.http.routers.krakend.tls=true"
-      - "traefik.http.routers.krakend.tls.certresolver=staging"
+      - "traefik.http.routers.krakend.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.krakend.loadbalancer.server.port=${PORT}"
     logging:
       options:

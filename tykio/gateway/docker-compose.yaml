@@ -21,7 +21,7 @@ services:
       - "traefik.http.routers.tyk-gateway.entrypoints=websecure"
       - "traefik.http.routers.tyk-gateway.service=tyk-gateway"
       - "traefik.http.routers.tyk-gateway.tls=true"
-      - "traefik.http.routers.tyk-gateway.tls.certresolver=staging"
+      - "traefik.http.routers.tyk-gateway.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.tyk-gateway.loadbalancer.server.port=${PORT}"
     logging:
       options:

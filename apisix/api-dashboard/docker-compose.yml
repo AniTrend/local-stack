@@ -18,7 +18,7 @@ services:
       - "traefik.http.routers.apisix-dashboard.entrypoints=web,websecure"
       - "traefik.http.routers.apisix-dashboard.service=apisix-dashboard"
       - "traefik.http.routers.apisix-dashboard.tls=true"
-      - "traefik.http.routers.apisix-dashboard.tls.certresolver=staging"
+      - "traefik.http.routers.apisix-dashboard.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.apisix-dashboard.loadbalancer.server.port=${PORT}"
     logging:
       options:

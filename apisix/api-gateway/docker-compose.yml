@@ -16,7 +16,7 @@ services:
       - "traefik.http.routers.apisix.entrypoints=web,websecure"
       - "traefik.http.routers.apisix.service=apisix"
       - "traefik.http.routers.apisix.tls=true"
-      - "traefik.http.routers.apisix.tls.certresolver=staging"
+      - "traefik.http.routers.apisix.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.apisix.loadbalancer.server.port=${PORT}"
     logging:
       options:

@@ -14,7 +14,7 @@ services:
       - "traefik.http.routers.anitrend-edge.entrypoints=web,websecure"
       - "traefik.http.routers.anitrend-edge.service=anitrend-edge"
       - "traefik.http.routers.anitrend-edge.tls=true"
-      - "traefik.http.routers.anitrend-edge.tls.certresolver=staging"
+      - "traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}"
 
 networks:
