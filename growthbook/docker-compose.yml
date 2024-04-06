@@ -11,7 +11,7 @@ services:
       - ${DASHBOARD_PORT}:3000
       - ${API_PORT}:3100
     labels:
-      - 'traefik.enable=true'
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
       - 'traefik.http.services.growth-dashboard.loadbalancer.server.port=${DASHBOARD_PORT}'
       - 'traefik.http.routers.growth-dashboard.entrypoints=web,websecure'

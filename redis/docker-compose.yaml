@@ -11,7 +11,7 @@ services:
     command: redis-server --appendonly yes
     env_file: .env
     labels:
-      - "traefik.enable=true"
+      - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.tcp.routers.redis.rule=HostSNI(`redis.docker.localhost`)"
       - "traefik.tcp.routers.redis.entrypoints=websecure"
       - "traefik.tcp.routers.redis.service=redis"

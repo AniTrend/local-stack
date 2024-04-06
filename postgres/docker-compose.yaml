@@ -10,7 +10,7 @@ services:
         - ${PORT}:${PORT}
       env_file: .env
       labels:
-        - "traefik.enable=true"
+        - "traefik.enable=${TRAEFIK_ENABLE}"
         - "traefik.tcp.routers.postgres.rule=HostSNI(`${HOST}`)"
         - "traefik.tcp.routers.postgres.entrypoints=websecure"
         - "traefik.tcp.routers.postgres.service=postgres"

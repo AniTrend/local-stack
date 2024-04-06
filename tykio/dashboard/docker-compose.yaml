@@ -12,7 +12,7 @@ services:
     volumes:
       - ./config/tyk.conf:/opt/tyk-gateway/tyk.conf
     labels:
-      - "traefik.enable=true"
+      - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.tyk-dashboard.rule=Host(`${HOST}`)"
       - "traefik.http.routers.tyk-dashboard.entrypoints=websecure"
       - "traefik.http.routers.tyk-dashboard.service=tyk-dashboard"

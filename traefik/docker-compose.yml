@@ -19,7 +19,7 @@ services:
       - ./config/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
-      - "traefik.enable=true"
+      - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.traefik-ui.rule=Host(`${HOST}`)"
       - "traefik.http.routers.traefik-ui.entrypoints=web,websecure"
       - "traefik.http.routers.traefik-ui.tls=true"

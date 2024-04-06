@@ -13,7 +13,7 @@ services:
       - portainer-data:/data
     env_file: .env
     labels:
-      - 'traefik.enable=true'
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.portainer.rule=Host(`${HOST}`)'
       - 'traefik.http.services.portainer.loadbalancer.server.port=${PORT}'
       - 'traefik.http.routers.portainer.entrypoints=web,websecure'

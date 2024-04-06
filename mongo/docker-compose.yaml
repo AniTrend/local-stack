@@ -13,7 +13,7 @@ services:
     volumes:
       - ./data/db:/data/db
     labels:
-      - "traefik.enable=true"
+      - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)"
       - "traefik.tcp.routers.mongo.entrypoints=websecure"
       - "traefik.tcp.routers.mongo.service=mongo"
