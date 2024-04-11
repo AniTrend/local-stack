@@ -14,6 +14,7 @@ services:
       - "traefik.http.routers.designer.entrypoints=web,websecure"
       - "traefik.http.routers.designer.service=designer"
       - "traefik.http.routers.designer.tls=true"
+      - "traefik.http.routers.designer.middlewares=sso"
       - "traefik.http.routers.designer.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.designer.loadbalancer.server.port=${PORT}"
       - "traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}"
