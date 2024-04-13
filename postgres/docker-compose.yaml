@@ -1,5 +1,12 @@
 version: '3'
 
+volumes:
+  data:
+    name: postgres-data
+    labels:
+      - "postgres"
+    driver: local
+
 services:
     postgres:
       container_name: "postgres"
@@ -8,6 +15,8 @@ services:
         - default
       ports:
         - ${PORT}:${PORT}
+      volumes:
+        - data:/var/lib/postgresql/data
       env_file: .env
       labels:
         - "traefik.enable=${TRAEFIK_ENABLE}"

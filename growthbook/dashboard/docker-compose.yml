@@ -1,15 +1,16 @@
 version: '3'
 
+volumes:
+  uploads:
+    driver: local
+
 services:
   growthbook:
     image: "growthbook/growthbook:2.9.0"
     container_name: growthbook
     volumes:
-      - ./data/uploads:/usr/local/src/app/packages/back-end/uploads
+      - uploads:/usr/local/src/app/packages/back-end/uploads
     env_file: .env
-    ports:
-      - ${DASHBOARD_PORT}:3000
-      - ${API_PORT}:3100
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
@@ -18,7 +19,7 @@ services:
       - 'traefik.http.routers.growth-dashboard.service=growth-dashboard'
       - 'traefik.http.routers.growth-dashboard.tls=true'
       - 'traefik.http.routers.growth-dashboard.tls.certresolver=${CERT_RESOLVER}'
-      - 'traefik.http.routers.growth-api.rule=Host(`${API_HOST}`)'
+      - 'traefik.http.routers.growth-api.rule=Host(`${DASHBOARD_API_HOST}`)'
       - 'traefik.http.services.growth-api.loadbalancer.server.port=${API_PORT}'
       - 'traefik.http.routers.growth-api.entrypoints=web,websecure'
       - 'traefik.http.routers.growth-api.service=growth-api'

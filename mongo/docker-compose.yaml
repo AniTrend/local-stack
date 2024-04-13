@@ -1,5 +1,9 @@
 version: '3'
 
+volumes:
+  mongo-data:
+    driver: local
+
 services:
   mongo:
     container_name: "mongo"
@@ -11,7 +15,9 @@ services:
     env_file:
       - .env
     volumes:
-      - ./data/db:/data/db
+      - mongo-data:/data
+      - mongo-data:/data/db
+      - mongo-data:/data/configdb
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)"

@@ -12,7 +12,6 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ./logs:/var/log/traefik/
       - ./ssl-certs:/ssl-certs:ro
       - ./auth/htpasswd:/etc/htpasswd:ro
       - ./config/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -22,15 +21,14 @@ services:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.traefik-ui.rule=Host(`${HOST}`)"
       - "traefik.http.routers.traefik-ui.entrypoints=web,websecure"
-      - "traefik.http.routers.traefik-ui.tls=true"
       - "traefik.http.routers.traefik-ui.service=api@internal"
       - "traefik.http.routers.traefik-ui.middlewares=sso"
+      - "traefik.http.routers.traefik-ui.tls=true"
+      - "traefik.http.routers.traefik-ui.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}"
       - "traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}"
       - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
       - "traefik.http.services.traefik-ui.loadbalancer.server.port=${PORT}"
-      - "traefik.tls.enable=true"
-      - "traefik.tls.certresolver=${CERT_RESOLVER}"
     logging:
       options:
         max-size: "10m"

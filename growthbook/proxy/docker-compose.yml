@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  proxy:
+    container_name: "growthbook-proxy"
+    image: "growthbook/proxy:git-e08a1b2"
+    env_file: .env
+    networks:
+      - default
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.growth-proxy.rule=Host(`${PROXY_HOST}`)'
+      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PROXY_PORT}'
+      - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
+      - 'traefik.http.routers.growth-proxy.service=growth-proxy'
+      - 'traefik.http.routers.growth-proxy.tls=true'
+      - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true
