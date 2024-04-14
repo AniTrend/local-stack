@@ -18,6 +18,7 @@ services:
       - mongo-data:/data
       - mongo-data:/data/db
       - mongo-data:/data/configdb
+    restart: unless-stopped
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)"
