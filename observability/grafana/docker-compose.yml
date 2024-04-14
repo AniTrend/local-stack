@@ -1,10 +1,16 @@
 version: '3'
+
+volumes:
+  data:
+    name: 'grafana-data'
+    driver: local
+
 services:
   grafana:
     container_name: grafana
-    image: grafana/grafana:10.4.2
+    image: grafana/grafana-oss:10.4.2
     volumes:
-      - ./data:/var/lib/grafana
+      - data:/var/lib/grafana
       - ./config/provisioning/:/etc/grafana/provisioning/
     env_file: .env
     labels:
