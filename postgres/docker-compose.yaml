@@ -26,6 +26,7 @@ services:
         - "traefik.tcp.routers.postgres.tls=true"
         - "traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}"
         - "traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}"
+      restart: unless-stopped
       logging:
         options:
           max-size: "10m"

@@ -6,8 +6,6 @@ services:
     networks:
       - default
     env_file: .env
-    ports: 
-      - ${PORT}:${PORT}
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.anitrend-edge.rule=Host(`${HOST}`)"
@@ -16,6 +14,7 @@ services:
       - "traefik.http.routers.anitrend-edge.tls=true"
       - "traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}"
+    restart: unless-stopeed
 
 networks:
   default:
