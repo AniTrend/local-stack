@@ -19,6 +19,11 @@ apisix:
   node_listen: 9080              # APISIX listening port
   enable_ipv6: false
 
+  enable_control: true
+  control:
+    ip: "0.0.0.0"
+    port: 9092
+
 deployment:
   admin:
     allow_admin:               # https://nginx.org/en/docs/http/ngx_http_access_module.html#allow
@@ -38,3 +43,8 @@ deployment:
       - "http://apisix-etcd:2379"          # multiple etcd address
     prefix: "/apisix"               # apisix configurations prefix
     timeout: 30                     # 30 seconds
+
+plugin_attr:
+  prometheus:
+    export_addr:
+      host: "http://prometheus:9090"

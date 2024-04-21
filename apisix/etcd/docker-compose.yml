@@ -1,4 +1,10 @@
 version: '3'
+
+volumes:
+  etcd-data:
+    name: 'etcd-data'
+    driver: local
+
 services:
   etcd:
     container_name: "apisix-etcd"
@@ -8,7 +14,7 @@ services:
     env_file: 
       - .env
     volumes:
-      - ./data:/bitnami/etcd
+      - etcd-data:/bitnami/etcd
     ports:
       - "${PORT}:${PORT}/tcp"
     restart: unless-stopped
