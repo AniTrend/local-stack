@@ -6,11 +6,9 @@ services:
     image: tykio/tyk-dashboard:v5.3
     networks:
       - default
-    ports: 
-      - ${PORT}:${PORT}
     env_file: .env
     volumes:
-      - ./config/tyk.conf:/opt/tyk-gateway/tyk.conf
+      - ./config/tyk.conf:/opt/tyk-dashboard/tyk_analytics.conf
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.tyk-dashboard.rule=Host(`${HOST}`)"

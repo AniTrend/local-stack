@@ -2,31 +2,22 @@
   "log_level": "info" ,
   "listen_port": 9000,
   "secret": "352d20ee67be67f6340b4c0605b044b7",
-  "admin_secret": "UFhtjpFdhhCaePH5",
-  "node_secret": "DJfgi5Lhuojp9kiy",
   "template_path": "/opt/tyk-gateway/templates",
   "tyk_js_path": "/opt/tyk-gateway/js/tyk.js",
   "middleware_path": "/opt/tyk-gateway/middleware",
-  "use_db_app_configs": true,
-  "db_app_conf_options": {
-    "connection_string": "http://tykio-dashboard:3000",
-    "node_is_segmented": false,
-    "tags": [
-      "test2"
-    ]
-  },
+  "use_db_app_configs": false,
   "app_path": "/opt/tyk-gateway/apps/",
   "storage": {
     "type": "redis",
     "host": "redis",
     "port": 6379,
     "username": "",
-    "password": "",
+    "password": "password",
     "database": 0,
     "optimisation_max_idle": 2000,
     "optimisation_max_active": 4000
   },
-  "enable_analytics": true,
+  "enable_analytics": false,
   "analytics_config": {
     "type": "",
     "ignored_ips": []
@@ -40,9 +31,8 @@
   "enable_redis_rolling_limiter": false,
   "allow_master_keys": false,
   "policies": {
-    "policy_source": "service",
-    "policy_connection_string": "http://tykio-dashboard:3000",
-    "policy_record_name": "tyk_policies"
+    "policy_source": "file",
+    "policy_record_name": "/opt/tyk-gateway/policies/policies.json"
   },
   "hash_keys": true,
   "close_connections": false,
