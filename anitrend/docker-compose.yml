@@ -2,12 +2,7 @@ version: '3'
 services:
   django-server:
     image: ghcr.io/anitrend/anitrend:0.1.1
-    command: 
-      - /bin/sh
-      - -c
-      - |
-        /usr/src/start-server.sh &
-        /usr/src/start-q.sh
+    command: ["/usr/src/start.sh"]
     container_name: django-server
     networks:
       - default
