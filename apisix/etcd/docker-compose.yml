@@ -15,8 +15,6 @@ services:
       - .env
     volumes:
       - etcd-data:/bitnami/etcd
-    ports:
-      - "${PORT}:${PORT}/tcp"
     restart: unless-stopped
     logging:
       options:
