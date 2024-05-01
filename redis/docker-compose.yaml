@@ -18,6 +18,7 @@ services:
       - "traefik.tcp.routers.redis.tls=true"
       - "traefik.tcp.routers.redis.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.tcp.services.redis.loadbalancer.server.port=${PORT}"
+    restart: unless-stopped
     logging:
       options:
         max-size: "10m"
