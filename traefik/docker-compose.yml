@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
-      - ./ssl-certs:/ssl-certs:ro
+      - ./certs:/etc/certs:ro
       - ./auth/htpasswd:/etc/htpasswd:ro
       - ./config/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./config/dynamic.yml:/etc/traefik/dynamic.yml:ro

@@ -31,5 +31,5 @@
 # 
 # tls:
 #   certificates:
-#     - certFile: "/ssl-certs/localhost.crt"
-#       keyFile: "/ssl-certs/localhost.key"
+#     - certFile: "/certs/local-cert.pem"
+#       keyFile: "/certs/local-key.pem"
