@@ -7,7 +7,7 @@ volumes:
 services:
   mongo:
     container_name: "mongo"
-    image: mongo:7.0.9
+    image: mongo:7.0.11
     networks:
       - default
     ports:
