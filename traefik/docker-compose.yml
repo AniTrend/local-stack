@@ -3,7 +3,7 @@ version: '3'
 services:
   traefik:
     container_name: "traefik"
-    image: traefik:v3.0
+    image: traefik:v3.1
     networks:
       - default
     ports:
