@@ -8,7 +8,7 @@ volumes:
 services:
   etcd:
     container_name: "apisix-etcd"
-    image: bitnami/etcd:3.5.14
+    image: bitnami/etcd:3.5.15
     networks:
       - default
     env_file: 
