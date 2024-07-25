@@ -6,7 +6,7 @@ volumes:
 
 services:
   growthbook:
-    image: "growthbook/growthbook:3.0.0"
+    image: "growthbook/growthbook:3.1.0"
     container_name: growthbook
     volumes:
       - uploads:/usr/local/src/app/packages/back-end/uploads
