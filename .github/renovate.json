@@ -11,5 +11,8 @@
   "baseBranches": [
     "dev"
   ],
-  "autoApprove": true
+  "autoApprove": true,
+  "automerge": true,
+  "automergeType": "pr",
+  "automergeStrategy": "rebase"
 }
