@@ -2,12 +2,13 @@ version: '3'
 
 volumes:
   uploads:
+    name: 'growthbook_dashboard-uploads'
     driver: local
 
 services:
   growthbook:
+    container_name: "growthbook"
     image: "growthbook/growthbook:3.3.0"
-    container_name: growthbook
     volumes:
       - uploads:/usr/local/src/app/packages/back-end/uploads
     env_file: .env
@@ -32,12 +33,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    #healthcheck:
-    #  test: ['CMD', 'wget', 'http://localhost:${API_PORT}']
-    #  interval: 20s
-    #  timeout: 5s
-    #  retries: 3
-    #  start_period: 10s
+    healthcheck:
+      test: ['CMD', 'wget', 'http://localhost:${API_PORT}']
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 networks:
   default:

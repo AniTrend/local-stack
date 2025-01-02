@@ -18,11 +18,9 @@ services:
       - "traefik.http.routers.grafana.rule=Host(`${HOST}`)"
       - "traefik.http.routers.grafana.entrypoints=web,websecure"
       - "traefik.http.routers.grafana.service=grafana"
+      #- "traefik.http.routers.grafana.middlewares=sso@docker"
       - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.routers.grafana.tls.certresolver=${CERT_RESOLVER}"
-      - "traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}"
-      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}"
-      - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
       - "traefik.http.services.grafana.loadbalancer.server.port=${PORT}"
     networks:
       - default

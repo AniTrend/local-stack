@@ -33,14 +33,41 @@ entryPoints:
         entryPoint:
           to: websecure
           scheme: https
+
   websecure:
     address: :443
+  metrics:
+    address: :8082
 
 # Configure your CertificateResolver here...
 # ---
 certificatesResolvers:
   staging:
-    tailscale: {}
+    acme:
+      email: anitrendapp@gmail.com
+      storage: /etc/traefik/certs/acme.json
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      httpChallenge:
+        entryPoint: web
+  production:
+    acme:
+      email: anitrendapp@gmail.com
+      storage: /etc/traefik/certs/acme.json
+      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      httpChallenge:
+        entryPoint: web
+
+# (Optional) Overwrite Default Certificates
+# tls:
+#   stores:
+#     default:
+#       defaultCertificate:
+#         certFile: /etc/traefik/certs/cert.pem
+#         keyFile: /etc/traefik/certs/cert-key.pem
+# (Optional) Disable TLS version 1.0 and 1.1
+#   options:
+#     default:
+#       minVersion: VersionTLS12
 
 providers:
   docker:

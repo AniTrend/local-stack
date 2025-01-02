@@ -1,4 +1,12 @@
 version: '3'
+
+volumes:
+  cache:
+    name: apisix-cache
+    labels:
+      - "co.anitrend.id=apisix-cache"
+    driver: local
+
 services:
   apisix_gateway:
     container_name: "apisix-gateway"
@@ -9,6 +17,7 @@ services:
       - .env
     volumes:
       - ./config/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - cache:/tmp/apisix-cache/
     restart: unless-stopped
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"

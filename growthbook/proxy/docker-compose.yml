@@ -3,14 +3,14 @@ version: '3'
 services:
   proxy:
     container_name: "growthbook-proxy"
-    image: "growthbook/proxy:git-e08a1b2"
+    image: growthbook/proxy:git-efec2de
     env_file: .env
     networks:
       - default
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
-      - 'traefik.http.routers.growth-proxy.rule=Host(`${PROXY_HOST}`)'
-      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PROXY_PORT}'
+      - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
+      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
       - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
       - 'traefik.http.routers.growth-proxy.service=growth-proxy'
       - 'traefik.http.routers.growth-proxy.tls=true'

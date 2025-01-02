@@ -4,7 +4,7 @@ volumes:
   data:
     name: postgres-data
     labels:
-      - "postgres"
+      - "co.anitrend.id=postgres-data"
     driver: local
 
 services:

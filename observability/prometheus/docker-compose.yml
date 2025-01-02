@@ -1,4 +1,9 @@
 version: '3'
+
+volumes:
+  prometheus-data:
+    driver: local
+
 services:
   prometheus:
     container_name: prometheus
@@ -6,22 +11,19 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.size=256MB'
+      - '--storage.tsdb.retention.size=512MB'
     env_file: .env
     volumes:
       - ./config/:/etc/prometheus/
-      - ./data:/prometheus
+      - prometheus-data:/prometheus
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.prometheus.rule=Host(`${HOST}`)"
       - "traefik.http.routers.prometheus.entrypoints=web,websecure"
       - "traefik.http.routers.prometheus.service=prometheus"
+      - "traefik.http.routers.prometheus.middlewares=sso@docker"
       - "traefik.http.routers.prometheus.tls=true"
       - "traefik.http.routers.prometheus.tls.certresolver=${CERT_RESOLVER}"
-      - "traefik.http.routers.prometheus.middlewares=sso"
-      - "traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}"
-      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}"
-      - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
       - "traefik.http.services.prometheus.loadbalancer.server.port=${PORT}"
     networks:
       - default

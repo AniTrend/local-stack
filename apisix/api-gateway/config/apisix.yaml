@@ -44,7 +44,7 @@ apisix:
   # lua_module_hook: "my_project.my_hook"  # Hook module used to inject third-party code into APISIX.
 
   proxy_cache:      # Proxy Caching configuration
-    cache_ttl: 45m  # The default caching time on disk if the upstream does not specify a caching time.
+    cache_ttl: 30m  # The default caching time on disk if the upstream does not specify a caching time.
     zones:
       - name: disk_cache_one    # Name of the cache.
         memory_size: 50m        # Size of the memory to store the cache index.
@@ -64,7 +64,7 @@ apisix:
                                       # servlet specification. See https://github.com/jakartaee/servlet/blob/master/spec/src/main/asciidoc/servlet-spec-body.adoc#352-uri-path-canonicalization, which is used in Tomcat.
 
   router:
-    http: radixtree_host_uri    # radixtree_host_uri: match route by host and URI
+    http: radixtree_uri_with_parameter    # radixtree_host_uri: match route by host and URI
                                 # radixtree_uri: match route by URI
                                 # radixtree_uri_with_parameter: similar to radixtree_uri but match URI with parameters. See https://github.com/api7/lua-resty-radixtree/#parameters-in-path for more details.
     ssl: radixtree_sni          # radixtree_sni: match route by SNI
@@ -498,20 +498,20 @@ plugin_attr:          # Plugin attributes
     max_size: -1      # Set the maximum size of log files in bytes before a rotation.
                       # Skip size check if max_size is less than 0.
     enable_compression: false    # Enable log file compression (gzip).
-  skywalking:                                     # Plugin: skywalking
-    service_name: APISIX                          # Set the service name for SkyWalking reporter.
-    service_instance_name: APISIX Instance Name   # Set the service instance name for SkyWalking reporter.
-    endpoint_addr: http://skywalking:12800         # Set the SkyWalking HTTP endpoint.
-    report_interval: 3                            # Set the reporting interval in second.
-  opentelemetry:      # Plugin: opentelemetry
-    trace_id_source: x-request-id   # Specify the source of the trace ID for OpenTelemetry traces.
-    resource:
-      service.name: APISIX          # Set the service name for OpenTelemetry traces.
-    collector:
-      address: open-telemetry:4318       # Set the address of the OpenTelemetry collector to send traces to.
-      request_timeout: 3            # Set the timeout for requests to the OpenTelemetry collector in seconds.
-      request_headers:              # Set the headers to include in requests to the OpenTelemetry collector.
-        Authorization: token        # Set the authorization header to include an access token.
+  # skywalking:                                     # Plugin: skywalking
+  #   service_name: APISIX                          # Set the service name for SkyWalking reporter.
+  #   service_instance_name: APISIX Instance Name   # Set the service instance name for SkyWalking reporter.
+  #   endpoint_addr: http://skywalking:12800         # Set the SkyWalking HTTP endpoint.
+  #   report_interval: 3                            # Set the reporting interval in second.
+  # opentelemetry:      # Plugin: opentelemetry
+  #   trace_id_source: x-request-id   # Specify the source of the trace ID for OpenTelemetry traces.
+  #   resource:
+  #     service.name: APISIX          # Set the service name for OpenTelemetry traces.
+  #   collector:
+  #     address: open-telemetry:4318       # Set the address of the OpenTelemetry collector to send traces to.
+  #     request_timeout: 3            # Set the timeout for requests to the OpenTelemetry collector in seconds.
+  #     request_headers:              # Set the headers to include in requests to the OpenTelemetry collector.
+  #       Authorization: token        # Set the authorization header to include an access token.
     batch_span_processor:
       drop_on_queue_full: false     # Drop spans when the export queue is full.
       max_queue_size: 1024          # Set the maximum size of the span export queue.
@@ -546,7 +546,7 @@ plugin_attr:          # Plugin attributes
       - 100
       - 200
       - 500
-    expire: 0                       # The expiration time after metrics become inactive, unit: second.
+    expire: 600                       # The expiration time after metrics become inactive, unit: second.
                                       # 0 means the metrics will not expire
                                       # If you need to set the expiration time, it is recommended to use 600, which is 10 minutes.
   server-info:                        # Plugin: server-info
@@ -582,16 +582,17 @@ deployment:                    # Deployment configurations
 
     admin_key:
       - name: admin
-        key: edd1c9f034335f136f87ad84b625c8f1
+        key: ${{ADMIN_KEY}}
         role: admin                 # admin: manage all configuration data
 
       - name: viewer
-        key: 4054f7cf07e344346cd3f287985e76a2
+        key: ${{VIEWER_KEY}}
         role: viewer
     enable_admin_cors: true       # Enable Admin API CORS response header `Access-Control-Allow-Origin`.
     
     allow_admin:                  # Limit Admin API access by IP addresses.
-      - 127.0.0.0/24              # If not set, any IP address is allowed.
+      - 127.0.0.0/8              # If not set, any IP address is allowed.
+      - ${{ALLOW_ADMIN_IP}}
     admin_listen:                 # Set the Admin API listening addresses.
       ip: 0.0.0.0                 # Set listening IP.
       port: ${{APISIX_ADMIN_PORT}}                  # Set listening port. Beware of port conflict with node_listen.
