@@ -7,7 +7,7 @@ volumes:
 services:
   app:
     container_name: portainer
-    image: 'portainer/portainer-ee:2.25.1'
+    image: 'portainer/portainer-ee:2.26.0'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer-data:/data
