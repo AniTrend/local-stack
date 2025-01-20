@@ -3,7 +3,7 @@ version: '3'
 services:
   krakend-ce:
     container_name: "krakend-ce"
-    image: devopsfaith/krakend:2.8
+    image: devopsfaith/krakend:2.9
     networks:
       - default
     env_file:
