@@ -16,10 +16,10 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
+      - traefik-ssl-certs:/etc/traefik/certs
       - ./auth/htpasswd:/etc/htpasswd:ro
       - ./config/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./config/dynamic.yml:/etc/traefik/dynamic.yml:ro
-      - /etc/traefik:/etc/traefik
       - /var/run/docker.sock:/var/run/docker.sock:ro
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
