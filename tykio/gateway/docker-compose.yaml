@@ -3,7 +3,7 @@ version: '3'
 services:
   tyk_gateway:
     container_name: "tykio-gateway"
-    image: tykio/tyk-gateway:v5.7.1
+    image: tykio/tyk-gateway:v5.7.2
     networks:
       - default
     env_file:
