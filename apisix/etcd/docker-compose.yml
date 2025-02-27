@@ -3,6 +3,8 @@ version: '3'
 volumes:
   etcd-data:
     name: 'etcd-data'
+    labels:
+      - "co.anitrend.id=etcd-data"
     driver: local
 
 services:

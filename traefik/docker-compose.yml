@@ -2,6 +2,9 @@ version: '3'
 
 volumes:
   traefik-ssl-certs:
+    name: 'traefik_traefik-ssl-certs'
+    labels:
+      - "co.anitrend.id=traefik-ssl-certs"
     driver: local
 
 services:
