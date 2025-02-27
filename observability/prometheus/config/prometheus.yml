@@ -1,25 +1,57 @@
 global:
-  scrape_interval:     15s
+  scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
     monitor: 'platform-health'
 
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
 rule_files:
   - 'alert.rules'
 
 scrape_configs:
+  # Prometheus self-monitoring
   - job_name: 'prometheus'
     scrape_interval: 5s
     static_configs:
       - targets: ['localhost:9090']
 
+  # OpenTelemetry Collector metrics
+  - job_name: 'otel-collector'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['otel-collector:8888']  # Internal metrics
+      - targets: ['otel-collector:8889']  # Prometheus exporter metrics
+
+  # Tempo metrics
+  - job_name: 'tempo'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['tempo:3200']
+
+  # Loki metrics
+  - job_name: 'loki'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['loki:3100']
+
+  # Traefik metrics
   - job_name: traefik
     metrics_path: /metrics
     static_configs:
-      - targets: [traefik:8080]
+      - targets: ['traefik:8080']
 
+  # APISIX metrics
   - job_name: "apisix"
     scrape_interval: 5s
     metrics_path: /apisix/prometheus/metrics
     static_configs:
       - targets: ['apisix-gateway:9090']
+
+  # Add exemplar support for Tempo trace linking
+  - job_name: 'traces'
+    honor_labels: true
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['tempo:3200']
+    params:
+      format: ['prometheus']

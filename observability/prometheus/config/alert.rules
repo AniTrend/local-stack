@@ -1,0 +1,121 @@
+groups:
+  - name: observability_stack
+    rules:
+      # Prometheus alerts
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus target missing (instance {{ $labels.instance }})"
+          description: "A Prometheus target has been down for 5 minutes\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      # OTEL Collector alerts
+      - alert: OTELCollectorHighMemory
+        expr: process_resident_memory_bytes{job="otel-collector"} > 1.5e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OTEL Collector high memory usage (instance {{ $labels.instance }})"
+          description: "OTEL Collector memory usage is above 1.5GB\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+      - alert: OTELCollectorDroppedSpans
+        expr: sum(rate(otelcol_processor_dropped_spans_total[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OTEL Collector is dropping spans"
+          description: "The collector has dropped {{ $value }} spans in the last 5 minutes"
+
+      # Loki alerts
+      - alert: LokiRequestErrors
+        expr: |
+          sum(rate(loki_request_duration_seconds_count{status_code=~"5.."}[5m]))
+          /
+          sum(rate(loki_request_duration_seconds_count[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki high request error rate"
+          description: "More than 5% of requests to Loki are failing"
+
+      - alert: LokiHighMemory
+        expr: container_memory_usage_bytes{container="loki"} > 2e9
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Loki high memory usage"
+          description: "Loki memory usage is above 2GB for 15 minutes"
+
+      # Tempo alerts
+      - alert: TempoIngestionRate
+        expr: rate(tempo_ingester_bytes_received_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tempo not receiving traces"
+          description: "Tempo has not received any traces in the last 5 minutes"
+
+  - name: infrastructure
+    rules:
+      # Gateway alerts
+      - alert: APIGatewayHighErrorRate
+        expr: |
+          sum(rate(apisix_http_status{code=~"5.."}[5m]))
+          /
+          sum(rate(apisix_http_status[5m])) 
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API Gateway high error rate"
+          description: "More than 5% of requests are resulting in 5xx errors"
+
+      - alert: TraefikHighErrorRate
+        expr: |
+          sum(rate(traefik_service_requests_total{code=~"5.."}[5m]))
+          /
+          sum(rate(traefik_service_requests_total[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Traefik high error rate"
+          description: "More than 5% of requests are resulting in 5xx errors"
+
+      # Resource alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage (instance {{ $labels.instance }})"
+          description: "CPU usage is above 85% for 15 minutes\n  VALUE = {{ $value }}%"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage (instance {{ $labels.instance }})"
+          description: "Memory usage is above 85% for 15 minutes\n  VALUE = {{ $value }}%"
+
+      - alert: DiskSpaceRunningOut
+        expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100 > 85
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space running out (instance {{ $labels.instance }})"
+          description: "Disk usage is above 85% for 15 minutes\n  VALUE = {{ $value }}%" 
