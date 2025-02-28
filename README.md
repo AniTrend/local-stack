@@ -5,6 +5,7 @@ A local development environment for the AniTrend stack, providing a complete inf
 ## Stack Components
 
 ### Gateway & Routing
+
 - **APISIX Gateway**
   - API Gateway for managing endpoints
   - Traffic management and routing
@@ -17,6 +18,7 @@ A local development environment for the AniTrend stack, providing a complete inf
   - Load balancing
 
 ### Databases
+
 - **PostgreSQL**
   - Primary relational database
   - Persistent data storage
@@ -33,12 +35,14 @@ A local development environment for the AniTrend stack, providing a complete inf
   - Session management
 
 ### Feature Management
+
 - **GrowthBook**
   - Feature flag management
   - A/B testing
   - Feature experimentation
 
 ### Container Management
+
 - **Portainer**
   - Container management UI
   - Stack deployment
@@ -51,6 +55,7 @@ The observability stack provides full monitoring capabilities through metrics, l
 ### Components
 
 #### Data Collection
+
 - **OpenTelemetry Collector**
   - Collects metrics, logs, and traces
   - Exposes ports:
@@ -61,6 +66,7 @@ The observability stack provides full monitoring capabilities through metrics, l
     - 13133: Health check
 
 #### Metrics
+
 - **Prometheus**
   - Metrics collection and storage
   - Retention: 512MB
@@ -72,17 +78,20 @@ The observability stack provides full monitoring capabilities through metrics, l
     - APISIX Gateway
 
 #### Logs
+
 - **Loki**
   - Log aggregation and storage
   - Integrated with Tempo for trace correlation
 
 #### Traces
+
 - **Tempo**
   - Distributed tracing backend
   - Integrates with Prometheus for metrics correlation
   - Integrates with Loki for log correlation
 
 #### Visualization
+
 - **Grafana**
   - Main visualization platform
   - Pre-configured data sources:
@@ -106,25 +115,29 @@ The observability stack provides full monitoring capabilities through metrics, l
 The stack includes pre-configured alerts for:
 
 #### Observability Stack Health
+
 - Prometheus target availability
 - OpenTelemetry Collector performance
 - Loki request errors and memory usage
 - Tempo trace ingestion
 
 #### Infrastructure Monitoring
+
 - API Gateway error rates (APISIX)
 - Traefik error rates
 - Resource usage (CPU, Memory, Disk)
 
 ## Getting Started
 
-1. Clone the repository:
+### 1. Clone the repository
+
 ```bash
 git clone https://github.com/your-org/local-stack.git
 cd local-stack
 ```
 
-2. Set up core infrastructure:
+### 2. Set up core infrastructure
+
 ```bash
 # Start Traefik first
 cd traefik
@@ -137,7 +150,8 @@ cd ../mongo && docker-compose up -d
 cd ../redis && docker-compose up -d
 ```
 
-3. Set up the observability stack:
+### 3. Set up the observability stack
+
 ```bash
 cd ../observability
 for dir in grafana prometheus loki tempo otel; do
@@ -146,7 +160,8 @@ done
 docker-compose up -d
 ```
 
-4. Set up additional services:
+### 4. Set up additional services
+
 ```bash
 # API Gateway
 cd ../apisix
@@ -163,15 +178,17 @@ cd ../portainer
 docker-compose up -d
 ```
 
-5. Access the services:
-- Grafana: https://grafana.your-domain.com
-- Prometheus: https://prometheus.your-domain.com
-- APISIX Dashboard: https://apisix.your-domain.com
-- Portainer: https://portainer.your-domain.com
-- GrowthBook: https://growthbook.your-domain.com
+### 5. Access the services
+
+- Grafana: <https://grafana.your-domain.com>
+- Prometheus: <https://prometheus.your-domain.com>
+- APISIX Dashboard: <https://apisix.your-domain.com>
+- Portainer: <https://portainer.your-domain.com>
+- GrowthBook: <https://growthbook.your-domain.com>
 
 ## Project Structure
-```
+
+```sh
 local-stack/
 ├── apisix/           # API Gateway configuration
 ├── anitrend/         # AniTrend application specific configs
@@ -188,13 +205,14 @@ local-stack/
 ## Configuration
 
 Each component has its own environment file for configuration. Copy the example files and modify as needed:
-```bash
+
+```sh
 find . -name ".env.example" -exec sh -c 'cp "$1" "${1%.example}"' _ {} \;
 ```
 
 ## License
 
-```
+```txt
 Copyright 2024 AniTrend
 
 Licensed under the Apache License, Version 2.0 (the "License");
