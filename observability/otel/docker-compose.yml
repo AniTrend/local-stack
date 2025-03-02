@@ -1,0 +1,39 @@
+volumes:
+  otel-data:
+    name: otel-data
+    driver: local
+
+services:
+  otel-collector:
+    container_name: otel-collector
+    image: otel/opentelemetry-collector-contrib:0.120.0
+    command: ["--config=/etc/otel-collector/config.yaml"]
+    volumes:
+      - ./config.yaml:/etc/otel-collector/config.yaml
+    env_file: .env
+    ports:
+      - "${OTLP_GRPC_PORT}:4317"   # OTLP gRPC
+      - "${METRICS_PORT}:8888"      # Internal metrics
+      - "${PROM_METRICS_PORT}:8889" # Prometheus exporter metrics
+      - "${HEALTH_CHECK_PORT}:13133" # Health check extension
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.otel.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.otel.entrypoints=web,websecure"
+      - "traefik.http.routers.otel.service=otel"
+      - "traefik.http.routers.otel.middlewares=sso@docker"
+      - "traefik.http.routers.otel.tls=true"
+      - "traefik.http.routers.otel.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.otel.loadbalancer.server.port=${PORT}"
+    networks:
+      - default
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true 

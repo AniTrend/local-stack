@@ -1,7 +1,5 @@
-version: '3'
-
 volumes:
-  data:
+  grafana-data:
     name: 'grafana-data'
     driver: local
 
@@ -10,7 +8,7 @@ services:
     container_name: grafana
     image: grafana/grafana-oss:11.5.2
     volumes:
-      - data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
       - ./config/provisioning/:/etc/grafana/provisioning/
     env_file: .env
     labels:
@@ -18,7 +16,6 @@ services:
       - "traefik.http.routers.grafana.rule=Host(`${HOST}`)"
       - "traefik.http.routers.grafana.entrypoints=web,websecure"
       - "traefik.http.routers.grafana.service=grafana"
-      #- "traefik.http.routers.grafana.middlewares=sso@docker"
       - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.routers.grafana.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.grafana.loadbalancer.server.port=${PORT}"

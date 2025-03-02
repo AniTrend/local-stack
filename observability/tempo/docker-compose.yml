@@ -1,0 +1,47 @@
+volumes:
+  tempo-data:
+    name: tempo-data
+    driver: local
+
+services:
+
+  memcached:
+    container_name: memcached
+    image: memcached:1.6.29
+    environment:
+      - MEMCACHED_MAX_MEMORY=64m  # Set the maximum memory usage
+      - MEMCACHED_THREADS=4       # Number of threads to use
+    networks:
+      - default
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  tempo:
+    container_name: tempo
+    image: grafana/tempo:2.7.1
+    user: tempo
+    command: ["-config.file=/etc/tempo/config.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo/config.yaml
+      - tempo-data:/var/tempo
+    environment:
+      - TEMPO_GID=10001
+      - TEMPO_UID=10001
+    env_file: .env
+    networks:
+      - default
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - memcached
+
+networks:
+  default:
+    name: traefik
+    external: true
