@@ -1,0 +1,59 @@
+datasources:
+  warehouse:
+    type: postgres
+    name: Main Warehouse
+    # Connection params (different for each type of data source)
+    params:
+      host: postgres
+      port: 5432
+      user: ${POSTGRES_USER} # use env for secrets
+      password: ${POSTGRES_PW} # use env for secrets
+      database: growthbook
+    # How to query the data (same for all SQL sources)
+    settings:
+      userIdTypes:
+        - userIdType: user_id
+          description: Logged-in user id
+        - userIdType: anonymous_id
+          description: Anonymous visitor id
+      queries:
+        exposure:
+          - id: user_id
+            name: Logged-in user experiments
+            userIdType: user_id
+            query: >
+              SELECT
+                user_id,
+                received_at as timestamp,
+                experiment_id,
+                variation_id,
+                context_location_country as country
+              FROM
+                experiment_viewed
+            dimensions:
+              - country
+        identityJoins:
+          - ids: ["user_id", "anonymous_id"]
+            query: SELECT user_id, anonymous_id FROM identifies
+metrics:
+  signups:
+    type: binomial
+    name: Sign Ups
+    userIdType: user_id
+    datasource: warehouse
+    sql: SELECT user_id, anonymous_id, received_at as timestamp FROM signups
+dimensions:
+  country:
+    name: Country
+    userIdType: user_id
+    datasource: warehouse
+    sql: SELECT user_id, country as value from users
+segments:
+  visitors:
+    name: Visitors in the US
+    datasource: warehouse
+    sql: |-
+      SELECT userid as user_id, timestamp as date
+      FROM users
+      WHERE country='US'
+    userIdType: user_id
