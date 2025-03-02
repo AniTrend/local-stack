@@ -6,8 +6,6 @@ services:
     image: redis:7.4-alpine
     networks:
       - default
-    ports:
-    - ${PORT}:${PORT}
     command: redis-server --appendonly yes
     env_file: .env
     labels:

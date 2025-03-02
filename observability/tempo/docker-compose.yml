@@ -10,7 +10,7 @@ services:
     image: memcached:1.6.29
     environment:
       - MEMCACHED_MAX_MEMORY=64m  # Set the maximum memory usage
-      - MEMCACHED_THREADS=4       # Number of threads to use
+      - MEMCACHED_THREADS=2       # Number of threads to use
     networks:
       - default
     restart: unless-stopped

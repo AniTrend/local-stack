@@ -88,6 +88,9 @@ metrics:
       - 0.3
       - 1.2
       - 5.0
+  otlp:
+    grpc:
+      endpoint: otel-collector:4317
 
 experimental:
   plugins:

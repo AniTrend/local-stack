@@ -11,11 +11,6 @@ services:
     volumes:
       - ./config.yaml:/etc/otel-collector/config.yaml
     env_file: .env
-    ports:
-      - "${OTLP_GRPC_PORT}:4317"   # OTLP gRPC
-      - "${METRICS_PORT}:8888"      # Internal metrics
-      - "${PROM_METRICS_PORT}:8889" # Prometheus exporter metrics
-      - "${HEALTH_CHECK_PORT}:13133" # Health check extension
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.otel.rule=Host(`${HOST}`)"

@@ -13,8 +13,6 @@ services:
       image: postgres:17
       networks:
         - default
-      ports:
-        - ${PORT}:${PORT}
       volumes:
         - data:/var/lib/postgresql/data
       env_file: .env
