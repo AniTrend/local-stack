@@ -2,33 +2,47 @@ volumes:
   prometheus-data:
     name: prometheus-data
     driver: local
-    external: true
+    labels:
+      - "co.anitrend.id=prometheus-data"
   loki-data:
     name: loki-data
     driver: local
-    external: true
+    labels:
+      - "co.anitrend.id=loki-data"
   tempo-data:
     name: tempo-data
     driver: local
-    external: true
+    labels:
+      - "co.anitrend.id=tempo-data"
   grafana-data:
     name: grafana-data
     driver: local
-    external: true
+    labels:
+      - "co.anitrend.id=grafana-data"
 
 services:
   otel-collector:
-    container_name: otel-collector
     image: otel/opentelemetry-collector-contrib:0.120.0
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+    networks:
+      default:
+        aliases:
+          - otel-collector
     command: ["--config=/etc/otel-collector/config.yaml"]
     volumes:
-      - ./otel/config.yaml:/etc/otel-collector/config.yaml
-    env_file: ./otel/.env
+      - ./observability/otel/config.yaml:/etc/otel-collector/config.yaml
     ports:
       - "${OTLP_GRPC_PORT}:4317"   # OTLP gRPC
       - "${METRICS_PORT}:8888"      # Internal metrics
       - "${PROM_METRICS_PORT}:8889" # Prometheus exporter metrics
       - "${HEALTH_CHECK_PORT}:13133" # Health check extension
+    env_file: ./observability/otel/.env
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.otel.rule=Host(`${HOST}`)"
@@ -42,26 +56,33 @@ services:
       - loki
       - tempo
       - prometheus
-    networks:
-      - default
-    restart: unless-stopped
     logging:
       options:
         max-size: "10m"
         max-file: "3"
 
   prometheus:
-    container_name: prometheus
     image: prom/prometheus:v2.55.1
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+    networks:
+      default:
+        aliases:
+          - prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.size=${STORAGE_TSDB_RETENTION_SIZE}'
       - '--web.enable-remote-write-receiver'
     volumes:
-      - ./prometheus/config/:/etc/prometheus/
+      - ./observability/prometheus/config/:/etc/prometheus/
       - prometheus-data:/prometheus
-    env_file: ./prometheus/.env
+    env_file: ./observability/prometheus/.env
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.prometheus.rule=Host(`${HOST}`)"
@@ -71,24 +92,29 @@ services:
       - "traefik.http.routers.prometheus.tls=true"
       - "traefik.http.routers.prometheus.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.prometheus.loadbalancer.server.port=${PORT}"
-    networks:
-      - default
-    restart: unless-stopped
     logging:
       options:
         max-size: "10m"
         max-file: "3"
 
   loki:
-    container_name: loki
     image: grafana/loki:3.4.2
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+    networks:
+      default:
+        aliases:
+          - loki
     command: -config.file=/etc/loki/config.yaml
     volumes:
-      - ./loki/config.yaml:/etc/loki/config.yaml
+      - ./observability/loki/config.yaml:/etc/loki/config.yaml
       - loki-data:/loki
-    env_file: ./loki/.env
-    networks:
-      - default
+    env_file: ./observability/loki/.env
     restart: unless-stopped
     logging:
       options:
@@ -96,28 +122,45 @@ services:
         max-file: "3"
 
   tempo:
-    container_name: tempo
     image: grafana/tempo:2.7.1
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+    networks:
+      default:
+        aliases:
+          - tempo
     command: ["-config.file=/etc/tempo/config.yaml"]
     volumes:
-      - ./tempo/tempo.yaml:/etc/tempo/config.yaml
+      - ./observability/tempo/tempo.yaml:/etc/tempo/config.yaml
       - tempo-data:/tmp/tempo
-    env_file: ./tempo/.env
-    networks:
-      - default
-    restart: unless-stopped
+    env_file: ./observability/tempo/.env
     logging:
       options:
         max-size: "10m"
         max-file: "3"
 
   grafana:
-    container_name: grafana
     image: grafana/grafana-oss:11.5.2
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+    networks:
+      default:
+        aliases:
+          - grafana
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./grafana/config/provisioning/:/etc/grafana/provisioning/
-    env_file: ./grafana/.env
+      - ./observability/grafana/config/provisioning/:/etc/grafana/provisioning/
+    env_file: ./observability/grafana/.env
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.grafana.rule=Host(`${HOST}`)"
@@ -130,9 +173,6 @@ services:
       - prometheus
       - loki
       - tempo
-    networks:
-      - default
-    restart: unless-stopped
     logging:
       options:
         max-size: "10m"
@@ -140,5 +180,5 @@ services:
 
 networks:
   default:
-    name: traefik
+    name: traefik-public
     external: true 
