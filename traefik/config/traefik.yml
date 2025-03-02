@@ -11,9 +11,11 @@ log:
 
 # (Optional) Accesslog
 # ---
-# accesslog:
-  # format: common  # common, json, logfmt
-  # filePath: /var/log/traefik/access.log
+accesslog:
+  otlp:
+    grpc:
+      endpoint: otel-collector:4317
+      insecure: true
 
 # (Optional) Enable API and Dashboard
 # ---
@@ -91,8 +93,16 @@ metrics:
   otlp:
     grpc:
       endpoint: otel-collector:4317
+      insecure: true
+
+tracing:
+  otlp:
+    grpc:
+      endpoint: otel-collector:4317
+      insecure: true
 
 experimental:
+  otlpLogs: true
   plugins:
     trauth:
       moduleName: "github.com/leonjza/trauth"
