@@ -384,7 +384,7 @@ plugins:                           # plugin list (sorted by priority)
   - request-id                     # priority: 12015
   - zipkin                         # priority: 12011
   #- skywalking                    # priority: 12010
-  #- opentelemetry                 # priority: 12009
+  - opentelemetry                 # priority: 12009
   - ext-plugin-pre-req             # priority: 12000
   - fault-injection                # priority: 11000
   - mocking                        # priority: 10900
@@ -510,8 +510,8 @@ plugin_attr:          # Plugin attributes
     collector:
       address: ${{OPEN_TELEMETRY_COLLECTOR}}       # Set the address of the OpenTelemetry collector to send traces to.
       request_timeout: 3            # Set the timeout for requests to the OpenTelemetry collector in seconds.
-      request_headers:              # Set the headers to include in requests to the OpenTelemetry collector.
-        Authorization: token        # Set the authorization header to include an access token.
+  #    request_headers:              # Set the headers to include in requests to the OpenTelemetry collector.
+  #      Authorization: token        # Set the authorization header to include an access token.
     batch_span_processor:
       drop_on_queue_full: false     # Drop spans when the export queue is full.
       max_queue_size: 1024          # Set the maximum size of the span export queue.
