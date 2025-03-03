@@ -7,7 +7,7 @@ services:
 
   memcached:
     container_name: memcached
-    image: memcached:1.6.29
+    image: memcached:1.6.37
     environment:
       - MEMCACHED_MAX_MEMORY=64m  # Set the maximum memory usage
       - MEMCACHED_THREADS=2       # Number of threads to use
