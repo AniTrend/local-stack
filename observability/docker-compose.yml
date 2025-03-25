@@ -113,7 +113,7 @@ services:
 
   grafana:
     container_name: grafana
-    image: grafana/grafana-oss:11.5.2
+    image: grafana/grafana-oss:11.5.3
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/config/provisioning/:/etc/grafana/provisioning/
