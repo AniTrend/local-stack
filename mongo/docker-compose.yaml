@@ -1,5 +1,3 @@
-version: '3'
-
 volumes:
   mongo-data:
     name: mongo_mongo-data

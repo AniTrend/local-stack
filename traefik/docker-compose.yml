@@ -1,5 +1,3 @@
-version: '3'
-
 volumes:
   traefik-ssl-certs:
     name: 'traefik_traefik-ssl-certs'
