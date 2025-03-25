@@ -8,12 +8,26 @@ processors:
   batch:
     timeout: 1s
     send_batch_size: 1024
+  attributes:
+    actions:
+    - action: insert
+      key: loki.attribute.labels
+      value: http_status_code
+  resource:
+    attributes:
+    - action: insert
+      key: loki.resource.labels
+      value: host_name, container_name
 
 exporters:
+  debug:
+    verbosity: detailed
+  loki:
+    endpoint: http://localhost:3100/loki/api/v1/push
+    tls:
+      insecure: true
   prometheus:
     endpoint: "0.0.0.0:8889"
-  loki:
-    endpoint: "http://loki:3100/loki/api/v1/push"
   otlp:
     endpoint: "tempo:4317"
     tls:
@@ -33,7 +47,7 @@ service:
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [loki]
+      exporters: [debug, loki]
     traces:
       receivers: [otlp]
       processors: [batch]
