@@ -6,7 +6,7 @@ volumes:
 services:
   mongo:
     container_name: "mongo"
-    image: mongo:8.0.6
+    image: mongo:8.0.8
     networks:
       - default
     env_file:
