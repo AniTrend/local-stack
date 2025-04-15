@@ -5,7 +5,7 @@ volumes:
 services:
   prometheus:
     container_name: prometheus
-    image: prom/prometheus:v3.2.1
+    image: prom/prometheus:v3.3.0
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
