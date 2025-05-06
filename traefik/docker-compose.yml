@@ -8,7 +8,7 @@ volumes:
 services:
   traefik:
     container_name: "traefik"
-    image: traefik:v3.3
+    image: traefik:v3.4
     networks:
       - default
     ports:
