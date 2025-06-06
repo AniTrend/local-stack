@@ -170,8 +170,9 @@ docker-compose up -d
 
 # Feature flags
 cd ../growthbook
-cp .env.example .env
-docker-compose up -d
+cp dashboard/.env.example dashboard/.env
+cp proxy/.env.example proxy/.env
+docker-compose -f docker.compose.yml up -d
 
 # Container management
 cd ../portainer
