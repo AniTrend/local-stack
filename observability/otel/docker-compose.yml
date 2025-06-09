@@ -6,7 +6,7 @@ volumes:
 services:
   otel-collector:
     container_name: otel-collector
-    image: otel/opentelemetry-collector-contrib:0.127.0
+    image: otel/opentelemetry-collector-contrib:0.128.0
     command: ["--config=/etc/otel-collector/config.yaml"]
     volumes:
       - ./config.yaml:/etc/otel-collector/config.yaml
