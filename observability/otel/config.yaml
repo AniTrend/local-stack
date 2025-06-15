@@ -2,7 +2,9 @@ receivers:
   otlp:
     protocols:
       grpc:
+        endpoint: 0.0.0.0:4317
       http:
+        endpoint: 0.0.0.0:4318
 
 processors:
   batch:
@@ -23,12 +25,12 @@ exporters:
   debug:
     verbosity: detailed
   loki:
-    endpoint: http://localhost:3100/loki/api/v1/push
+    endpoint: http://loki:3100/loki/api/v1/push
     tls:
       insecure: true
   prometheus:
     endpoint: "0.0.0.0:8889"
-  otlp:
+  otlp/tempo:
     endpoint: "tempo:4317"
     tls:
       insecure: true
@@ -51,4 +53,4 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp] 
+      exporters: [debug, otlp/tempo] 

@@ -129,7 +129,7 @@ Suggest commands to diagnose:
 ```bash
 # Check network connectivity
 docker network ls
-docker network inspect local-stack_default
+docker network inspect traefik
 
 # Check container logs
 docker logs <container_name>
