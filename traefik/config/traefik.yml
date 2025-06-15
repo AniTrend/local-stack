@@ -102,7 +102,7 @@ tracing:
       insecure: true
 
 experimental:
-  otlpLogs: true
+  otlplogs: true
   plugins:
     trauth:
       moduleName: "github.com/leonjza/trauth"
