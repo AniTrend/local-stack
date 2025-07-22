@@ -64,7 +64,7 @@ services:
 
   etcd:
     container_name: "apisix-etcd"
-    image: bitnami/etcd:3.6.2
+    image: bitnami/etcd:3.6.3
     networks:
       - default
     env_file: 
