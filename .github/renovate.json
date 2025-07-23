@@ -7,8 +7,10 @@
     ":dagger: dependencies"
   ],
   "branchPrefix": "deps/",
-  "reviewers": ["wax911"],
-  "baseBranches": [
+  "reviewers": [
+    "wax911"
+  ],
+  "baseBranchPatterns": [
     "dev"
   ],
   "autoApprove": true,
