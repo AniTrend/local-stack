@@ -1,6 +1,6 @@
 services:
   anitrend-edge:
-    image: ghcr.io/anitrend/on-the-edge:0.6.1
+    image: ghcr.io/anitrend/on-the-edge:0.6.2
     container_name: anitrend-edge
     networks:
       - default
