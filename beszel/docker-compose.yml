@@ -1,0 +1,55 @@
+volumes:
+  beszel-data:
+    name: 'beszel-data'
+    driver: local
+
+  beszel-socket:
+    name: 'beszel-socket'
+    driver: local
+
+services:
+  beszel:
+    image: henrygd/beszel:0.12.3
+    container_name: beszel
+    restart: unless-stopped
+    ports:
+      - 8090:8090
+    networks:
+      - default
+    volumes:
+      - beszel-data:/beszel_data
+      - beszel-socket:/beszel_socket
+    env_file:
+      - .env
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.beszel.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.beszel.entrypoints=web,websecure"
+      - "traefik.http.services.beszel.loadbalancer.server.port=${PORT}"
+      - "traefik.http.routers.beszel.service=beszel"
+      - "traefik.http.routers.beszel.tls=true"
+      - "traefik.http.routers.beszel.tls.certresolver=${CERT_RESOLVER}"
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  beszel-agent:
+    image: henrygd/beszel-agent:0.12.3
+    container_name: beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - beszel-socket:/beszel_socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    env_file: 
+      - .env
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true
