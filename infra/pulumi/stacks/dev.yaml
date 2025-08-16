@@ -1,0 +1,25 @@
+config:
+  local-stack:mode: compose
+  local-stack:composeServices:
+    - traefik
+    - postgres
+    - mongo
+    - redis
+    - apisixEtcd
+    - apisixGateway
+    - apisixDashboard
+    - grafana
+    - prometheus
+    - loki
+    - tempo
+    - otel
+    - growthbookDashboard
+    - growthbookProxy
+    - portainer
+    - anitrend
+    - beszel
+    - onTheEdge
+  # Optional umbrella compose files (enable if you prefer stacking by domain):
+  # - observabilityAll
+  # - apisixAll
+  # - growthbookAll

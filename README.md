@@ -228,3 +228,23 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ```
+
+## Pulumi Orchestration (optional)
+
+We include a Pulumi project under `infra/pulumi` to orchestrate the existing Docker Compose and Swarm configurations from a single entrypoint.
+
+Quick start:
+
+1. Prerequisites: Pulumi CLI, Node.js (v18+), Docker running.
+2. Install deps:
+  - cd infra/pulumi
+  - npm install
+3. Select stack and deploy (compose mode):
+  - pulumi stack init dev --non-interactive || true
+  - pulumi stack select dev
+  - npm run up
+4. Swarm mode:
+  - pulumi config set local-stack:mode swarm
+  - npm run up
+
+This approach keeps your Compose files as the source of truth while adding Pulumi lifecycle (preview, up, destroy) and optional Swarm deployment using the existing swarm YAML files.

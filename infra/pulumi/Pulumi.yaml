@@ -1,0 +1,3 @@
+name: local-stack
+runtime: nodejs
+description: Local development stack managed by Pulumi (Compose or Swarm)

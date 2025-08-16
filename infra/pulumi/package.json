@@ -1,0 +1,19 @@
+{
+  "name": "local-stack-infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "preview": "pulumi preview",
+    "up": "pulumi up --yes",
+  "destroy": "pulumi destroy --yes"
+  },
+  "dependencies": {
+    "@pulumi/command": "1.1.0",
+    "@pulumi/pulumi": "3.190.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "packageManager": "yarn@4.9.2"
+}
