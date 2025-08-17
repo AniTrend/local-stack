@@ -35,7 +35,7 @@ Goal: help an automated coding agent become productive quickly by describing the
 - Avoid changing `swarm.*.yml` files unless implementing swarm deployments — these are separate from the default Compose development flow.
 
 5) Integration points and external dependencies
-- Services communicate over Docker networks created by Compose. Many services expect Traefik to provide host-based routing and TLS.
+- Services communicate over Docker networks created by Compose, with many services expecting Traefik to provide host-based routing and TLS termination.
 - External dependencies: none hard-coded — services are brought up locally; however some components expect valid certificates in `traefik/certs` or secrets set in `.env` files.
 
 6) Common pitfalls and agent guidance
