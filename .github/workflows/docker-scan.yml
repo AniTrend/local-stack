@@ -1,0 +1,22 @@
+name: Docker security scan
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ main ]
+
+jobs:
+  trivy-scan:
+    name: Run Trivy filesystem scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy Action
+        uses: aquasecurity/trivy-action@0.32.0
+        with:
+          format: 'table'
+          scan-type: 'fs'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '1'
+          ignore-unfixed: true
