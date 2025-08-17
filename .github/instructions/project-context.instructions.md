@@ -1,5 +1,7 @@
-# GitHub Copilot Instructions for Local-Stack
-
+---
+applyTo: **
+description: This document provides an overview of the Local-Stack project, its structure, service configurations, common tasks, and best practices for local development infrastructure using Docker Compose.
+---
 ## Project Overview
 Local-Stack is a comprehensive local development infrastructure built with Docker Compose. It provides a collection of services commonly needed for application development including databases, API gateways, observability tools, reverse proxies, and more. This environment allows developers to run and test applications with a production-like infrastructure locally.
 
