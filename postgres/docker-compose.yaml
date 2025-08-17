@@ -1,3 +1,4 @@
+---
 volumes:
   data:
     name: postgres-data
@@ -6,27 +7,27 @@ volumes:
     driver: local
 
 services:
-    postgres:
-      container_name: "postgres"
-      image: postgres:17
-      networks:
-        - default
-      volumes:
-        - data:/var/lib/postgresql/data
-      env_file: .env
-      labels:
-        - "traefik.enable=${TRAEFIK_ENABLE}"
-        - "traefik.tcp.routers.postgres.rule=HostSNI(`${HOST}`)"
-        - "traefik.tcp.routers.postgres.entrypoints=websecure"
-        - "traefik.tcp.routers.postgres.service=postgres"
-        - "traefik.tcp.routers.postgres.tls=true"
-        - "traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}"
-        - "traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}"
-      restart: unless-stopped
-      logging:
-        options:
-          max-size: "10m"
-          max-file: "3"
+  postgres:
+    container_name: "postgres"
+    image: postgres:17
+    networks:
+      - default
+    volumes:
+      - data:/var/lib/postgresql/data
+    env_file: .env
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.tcp.routers.postgres.rule=HostSNI(`${HOST}`)"
+      - "traefik.tcp.routers.postgres.entrypoints=websecure"
+      - "traefik.tcp.routers.postgres.service=postgres"
+      - "traefik.tcp.routers.postgres.tls=true"
+      - "traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}"
+    restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:

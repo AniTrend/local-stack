@@ -1,3 +1,4 @@
+---
 volumes:
   cache:
     name: apisix-cache
@@ -35,4 +36,3 @@ networks:
   default:
     name: traefik
     external: true
-    

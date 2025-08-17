@@ -1,8 +1,9 @@
+---
 volumes:
   loki-data:
     name: loki-data
     driver: local
-
+    # external: true
 services:
   loki:
     container_name: loki
@@ -23,4 +24,4 @@ services:
 networks:
   default:
     name: traefik
-    external: true 
+    external: true
