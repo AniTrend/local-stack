@@ -8,7 +8,7 @@ description: Copilot instructions for Local-Stack repository
 Goal: help an automated coding agent become productive quickly by describing the architecture, common developer workflows, repository conventions, and where to make safe, minimal changes.
 
 1) Big-picture architecture
-- This repo is a Docker Compose based local infrastructure for the AniTrend stack. Major service groups live in top-level folders: `traefik/`, `apisix/`, `observability/`, `postgres/`, `mongo/`, `redis/`, `growthbook/`, `portainer/`, `anitrend/`, and `on-the-edge/`.
+- This repo is a Docker Compose-based local infrastructure for the AniTrend stack. Major service groups live in top-level folders: `traefik/`, `apisix/`, `observability/`, `postgres/`, `mongo/`, `redis/`, `growthbook/`, `portainer/`, `anitrend/`, and `on-the-edge/`.
 - Traefik acts as the edge router and TLS terminator. Most services are fronted via subdomains (e.g. `grafana.localhost`, `apisix.localhost`) and configured under `traefik/config`.
 - Observability is in `observability/` and contains `grafana/`, `prometheus/`, `loki/`, `tempo/`, `otel/` subfolders with their own compose files and provisioning configs.
 
