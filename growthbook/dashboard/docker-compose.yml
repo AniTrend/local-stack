@@ -1,3 +1,4 @@
+---
 volumes:
   uploads:
     name: 'growthbook_dashboard-uploads'

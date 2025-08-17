@@ -1,3 +1,4 @@
+---
 services:
   apisix_dashboard:
     container_name: "apisix-dashobard"

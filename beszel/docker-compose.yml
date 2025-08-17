@@ -1,3 +1,4 @@
+---
 volumes:
   beszel-data:
     name: 'beszel-data'
@@ -41,7 +42,7 @@ services:
     volumes:
       - beszel-socket:/beszel_socket
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    env_file: 
+    env_file:
       - .env
     logging:
       options:

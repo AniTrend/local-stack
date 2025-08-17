@@ -1,3 +1,4 @@
+---
 services:
   django-server:
     image: ghcr.io/anitrend/anitrend:0.6.1

@@ -1,3 +1,4 @@
+---
 volumes:
   etcd-data:
     name: 'etcd-data'
@@ -11,7 +12,7 @@ services:
     image: bitnami/etcd:3.6.4
     networks:
       - default
-    env_file: 
+    env_file:
       - .env
     volumes:
       - etcd-data:/bitnami/etcd
@@ -20,7 +21,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-
 
 networks:
   default:

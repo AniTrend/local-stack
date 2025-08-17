@@ -26,7 +26,7 @@ jobs:
           set -euo pipefail
           files=$(git ls-files "**/docker-compose*.yml" "**/docker-compose*.yaml" || true)
           if [ -n "$files" ]; then
-            echo "$files" | xargs yamllint || true
+            echo "$files" | xargs yamllint
           else
             echo "No compose files found"
           fi

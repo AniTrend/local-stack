@@ -1,3 +1,4 @@
+---
 services:
   proxy:
     container_name: "growthbook-proxy"
@@ -18,12 +19,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    #healthcheck:
-    #  test: ['CMD', 'curl', '-f', 'http://localhost:${PORT}/healthcheck']
-    #  interval: 20s
-    #  timeout: 5s
-    #  retries: 3
-    #  start_period: 10s
+    # healthcheck:
+    #   test: ['CMD', 'curl', '-f', 'http://localhost:${PORT}/healthcheck']
+    #   interval: 20s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 10s
 
 networks:
   default:
