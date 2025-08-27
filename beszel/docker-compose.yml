@@ -36,7 +36,7 @@ services:
         max-file: "3"
 
   beszel-agent:
-    image: henrygd/beszel-agent:0.12.4
+    image: henrygd/beszel-agent:0.12.5
     container_name: beszel-agent
     restart: unless-stopped
     volumes:
