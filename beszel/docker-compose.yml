@@ -37,6 +37,8 @@ services:
     image: henrygd/beszel-agent:0.12.7
     container_name: beszel-agent
     restart: unless-stopped
+    networks:
+      - default
     volumes:
       - beszel-socket:/beszel_socket
       - /var/run/docker.sock:/var/run/docker.sock:ro
