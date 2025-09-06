@@ -1,4 +1,5 @@
 receivers:
+  # Accept OTLP over gRPC & HTTP from instrumented services
   otlp:
     protocols:
       grpc:
@@ -7,33 +8,41 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
+  # Enrich resource with labels to pass through to Loki (requires loki exporter build)
+  resource:
+    attributes:
+      - action: insert
+        key: loki.resource.labels
+        value: host_name, container_name
+  # Map selected attribute keys into Loki stream labels
+  attributes:
+    actions:
+      - action: insert
+        key: loki.attribute.labels
+        value: http_status_code
+  # Batch for efficiency
   batch:
     timeout: 1s
     send_batch_size: 1024
-  attributes:
-    actions:
-    - action: insert
-      key: loki.attribute.labels
-      value: http_status_code
-  resource:
-    attributes:
-    - action: insert
-      key: loki.resource.labels
-      value: host_name, container_name
 
 exporters:
-  debug:
-    verbosity: detailed
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
-    tls:
-      insecure: true
+  # Prometheus endpoint for metrics scraping by Prometheus server
   prometheus:
     endpoint: "0.0.0.0:8889"
+  # Tempo (traces) via OTLP gRPC
   otlp/tempo:
     endpoint: "tempo:4317"
     tls:
       insecure: true
+  # Send logs (and could send traces/metrics if desired) to Loki via its OTLP HTTP ingest endpoint.
+  # NOTE: Requires Loki to be started with otlp ingestion enabled (see loki config otlp_config block we will add).
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+  # Debug exporter for troubleshooting (remove in production)
+  debug:
+    verbosity: detailed
 
 extensions:
   health_check:
@@ -48,9 +57,10 @@ service:
       exporters: [prometheus]
     logs:
       receivers: [otlp]
-      processors: [batch]
-      exporters: [debug, loki]
+      # Order: enrichment -> batch
+      processors: [resource, attributes, batch]
+      exporters: [otlphttp/loki, debug]
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug, otlp/tempo] 
+      exporters: [otlp/tempo, debug]
