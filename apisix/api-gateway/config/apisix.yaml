@@ -577,6 +577,38 @@ plugin_attr:          # Plugin attributes
   zipkin:                             # Plugin: zipkin
     set_ngx_var: false                # export zipkin variables to nginx variables
 
+# Global logging rule: forward all request/response logs to Loki for Grafana visualization
+global_rules:
+  - id: loki-all
+    plugins:
+      loki-logger:
+        endpoint_addrs:
+          - http://loki:3100
+        log_labels:
+          job: apisix
+          service: ${{OTEL_SERVICE_NAME}}
+          env: ${{OTEL_DEPLOYMENT_ENVIRONMENT}}
+          host: "$hostname"
+          route: "$route_id"
+        # Custom concise log format (remove or comment out to retain default rich structure)
+        log_format:
+          time: "$time_iso8601"
+          trace_id: "$opentelemetry_trace_id"
+          span_id: "$opentelemetry_span_id"
+          client_ip: "$remote_addr"
+          method: "$request_method"
+          path: "$uri"
+          status: "$status"
+          upstream_addr: "$upstream_addr"
+          upstream_status: "$upstream_status"
+          req_time_s: "$request_time"
+          ua: "$http_user_agent"
+        timeout: 3000
+        keepalive: true
+        keepalive_pool: 5
+        include_req_body: false
+        include_resp_body: false
+
 
 deployment:                    # Deployment configurations
   role: traditional            # Set deployment mode: traditional, control_plane, or data_plane.
