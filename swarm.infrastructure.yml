@@ -1,3 +1,8 @@
+###
+# DEPRECATED: Initial Swarm attempt. Do not use for deployments.
+# This file is retained for reference only.
+# New modular stacks will live under stacks/ (infrastructure.yml, observability.yml, platform.yml).
+###
 volumes:
   traefik-ssl-certs:
     name: "traefik_traefik-ssl-certs"
