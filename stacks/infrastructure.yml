@@ -21,6 +21,9 @@ volumes:
   mongo-data:
     name: mongo_mongo-data
     driver: local
+  mongo-config:
+    name: mongo_mongo-config
+    driver: local
 
 services:
   traefik:
@@ -201,7 +204,7 @@ services:
       - ./mongo/.env
     volumes:
       - mongo-data:/data/db
-      - mongo-data:/data/configdb
+      - mongo-config:/data/configdb
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 20s

@@ -152,7 +152,7 @@ services:
       - ./observability/otel/config.yaml:/etc/otel-collector/config.yaml
     env_file: ./observability/otel/.env
     healthcheck:
-      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:${HEALTH_CHECK_PORT:-13133}/ || exit 1"]
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:13133/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
