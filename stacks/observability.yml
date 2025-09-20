@@ -47,6 +47,9 @@ services:
       - "traefik.http.routers.prometheus.tls=true"
       - "traefik.http.routers.prometheus.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.prometheus.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.prometheus.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.prometheus.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.prometheus.loadbalancer.healthcheck.timeout=2s"
 
   loki:
     image: grafana/loki:3.5.5
@@ -111,6 +114,9 @@ services:
       - "traefik.http.routers.grafana.tls=true"
       - "traefik.http.routers.grafana.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.grafana.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.grafana.loadbalancer.healthcheck.path=/login"
+      - "traefik.http.services.grafana.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.grafana.loadbalancer.healthcheck.timeout=2s"
     depends_on:
       - prometheus
       - loki
@@ -142,6 +148,9 @@ services:
       - "traefik.http.routers.otel.tls=true"
       - "traefik.http.routers.otel.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.otel.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.otel.loadbalancer.healthcheck.path=/v1/healthz"
+      - "traefik.http.services.otel.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.otel.loadbalancer.healthcheck.timeout=3s"
     depends_on:
       - loki
       - tempo
@@ -171,6 +180,9 @@ services:
       - "traefik.http.routers.beszel.service=beszel"
       - "traefik.http.routers.beszel.tls=true"
       - "traefik.http.routers.beszel.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.beszel.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.beszel.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.beszel.loadbalancer.healthcheck.timeout=3s"
 
   beszel-agent:
     image: henrygd/beszel-agent:0.12.9

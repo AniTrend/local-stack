@@ -56,6 +56,9 @@ services:
       - "traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}"
       - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
       - "traefik.http.services.traefik-ui.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.traefik-ui.loadbalancer.healthcheck.path=/dashboard/"
+      - "traefik.http.services.traefik-ui.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.traefik-ui.loadbalancer.healthcheck.timeout=2s"
 
   portainer:
     image: portainer/portainer-ee:2.34.0
@@ -80,6 +83,9 @@ services:
       - "traefik.http.routers.portainer.service=portainer"
       - "traefik.http.routers.portainer.tls=true"
       - "traefik.http.routers.portainer.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.portainer.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.portainer.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.portainer.loadbalancer.healthcheck.timeout=2s"
 
   apisix_etcd:
     image: bitnami/etcd:3.6.4
@@ -116,6 +122,9 @@ services:
       - "traefik.http.routers.apisix.tls=true"
       - "traefik.http.routers.apisix.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.apisix.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.apisix.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.apisix.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.apisix.loadbalancer.healthcheck.timeout=2s"
     depends_on:
       - apisix_etcd
 
@@ -142,6 +151,9 @@ services:
       - "traefik.http.routers.apisix-dashboard.tls=true"
       - "traefik.http.routers.apisix-dashboard.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.apisix-dashboard.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.apisix-dashboard.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.apisix-dashboard.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.apisix-dashboard.loadbalancer.healthcheck.timeout=2s"
     depends_on:
       - apisix_gateway
 
