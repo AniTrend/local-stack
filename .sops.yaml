@@ -1,0 +1,7 @@
+# SOPS configuration for encrypting secrets committed to the repo
+creation_rules:
+  - path_regex: secrets/.*\.(env|yaml|yml)$
+    # Replace with your age public key(s)
+    age:
+      - "AGE1_PUBLIC_KEY_HERE"
+    encrypted_regex: '^(?!#)'
