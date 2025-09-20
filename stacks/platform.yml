@@ -25,12 +25,18 @@ services:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
       - 'traefik.http.services.growth-dashboard.loadbalancer.server.port=${DASHBOARD_PORT}'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.healthcheck.path=/'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.healthcheck.interval=5s'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.healthcheck.timeout=2s'
       - 'traefik.http.routers.growth-dashboard.entrypoints=web,websecure'
       - 'traefik.http.routers.growth-dashboard.service=growth-dashboard'
       - 'traefik.http.routers.growth-dashboard.tls=true'
       - 'traefik.http.routers.growth-dashboard.tls.certresolver=${CERT_RESOLVER}'
       - 'traefik.http.routers.growth-api.rule=Host(`${DASHBOARD_API_HOST}`)'
       - 'traefik.http.services.growth-api.loadbalancer.server.port=${API_PORT}'
+      - 'traefik.http.services.growth-api.loadbalancer.healthcheck.path=/'
+      - 'traefik.http.services.growth-api.loadbalancer.healthcheck.interval=5s'
+      - 'traefik.http.services.growth-api.loadbalancer.healthcheck.timeout=2s'
       - 'traefik.http.routers.growth-api.entrypoints=web,websecure'
       - 'traefik.http.routers.growth-api.service=growth-api'
       - 'traefik.http.routers.growth-api.tls=true'
@@ -47,11 +53,16 @@ services:
       default:
         aliases:
           - growthbook-proxy
+    depends_on:
+      - growthbook
     env_file: ./growthbook/proxy/.env
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
       - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
+      - 'traefik.http.services.growth-proxy.loadbalancer.healthcheck.path=/'
+      - 'traefik.http.services.growth-proxy.loadbalancer.healthcheck.interval=5s'
+      - 'traefik.http.services.growth-proxy.loadbalancer.healthcheck.timeout=2s'
       - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
       - 'traefik.http.routers.growth-proxy.service=growth-proxy'
       - 'traefik.http.routers.growth-proxy.tls=true'
@@ -78,6 +89,9 @@ services:
       - "traefik.http.routers.anitrend-graphql.tls=true"
       - "traefik.http.routers.anitrend-graphql.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.anitrend-graphql.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.timeout=2s"
 
   anitrend_edge:
     image: ghcr.io/anitrend/on-the-edge:0.7.2
@@ -99,6 +113,9 @@ services:
       - "traefik.http.routers.anitrend-edge.tls=true"
       - "traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.timeout=2s"
 
 networks:
   default:
