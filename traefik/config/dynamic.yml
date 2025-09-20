@@ -1,35 +1,6 @@
-# http:
-#   routers:
-#     traefik-ui:
-#       entryPoints:
-#         - web
-#         - websecure
-#       rule: "Host(`traefik.docker.localhost`)"
-#       service: "api@internal"
-#       middlewares:
-#         - "sso"
-# 
-#   middlewares:
-#     sso:
-#       plugin:
-#         trauth:
-#           domain: "docker.localhost"
-#           cookiename: "sso-cookie"
-#           users: "${SSO_CREDENTIALS}"
-# 
-#   services:
-#     traefik-ui:
-#       loadBalancer:
-#         server:
-#           port: 8080
-# 
-#   tls:
-#     domains:
-#       - main: "docker.localhost"
-#         sans:
-#           - "*.docker.localhost"
-# 
-# tls:
-#   certificates:
-#     - certFile: "/certs/local-cert.pem"
-#       keyFile: "/certs/local-key.pem"
+# Dynamic TLS certificates for local development
+# Note: Routers/middlewares/services are defined via Docker labels to avoid duplication.
+tls:
+  certificates:
+    - certFile: "/etc/traefik/certs/local-cert.pem"
+      keyFile: "/etc/traefik/certs/local-key.pem"

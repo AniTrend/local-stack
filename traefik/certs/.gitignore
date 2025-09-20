@@ -1,0 +1,12 @@
+# Ignore local TLS certificates and ACME storage
+*.pem
+*.key
+*.crt
+acme*.json
+*.pfx
+*.p12
+*.der
+
+# But keep the directory tracked
+!.gitignore
+!.keep
