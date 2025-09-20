@@ -21,6 +21,12 @@ services:
     volumes:
       - growthbook_dashboard-uploads:/usr/local/src/app/packages/back-end/uploads
     env_file: ./growthbook/dashboard/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$DASHBOARD_PORT/ && curl -sS -o /dev/null http://127.0.0.1:$API_PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
@@ -56,6 +62,12 @@ services:
     depends_on:
       - growthbook
     env_file: ./growthbook/proxy/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
@@ -81,6 +93,12 @@ services:
           - anitrend
     command: ["/usr/src/start.sh"]
     env_file: ./anitrend/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.anitrend-graphql.rule=Host(`${HOST}`)"
@@ -105,6 +123,12 @@ services:
         aliases:
           - anitrend-edge
     env_file: ./on-the-edge/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.anitrend-edge.rule=Host(`${HOST}`)"

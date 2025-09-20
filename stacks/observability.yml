@@ -38,6 +38,12 @@ services:
       - ./observability/prometheus/config/:/etc/prometheus/
       - prometheus-data:/prometheus
     env_file: ./observability/prometheus/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/-/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.prometheus.rule=Host(`${HOST}`)"
@@ -106,6 +112,12 @@ services:
       - grafana-data:/var/lib/grafana
       - ./observability/grafana/config/provisioning/:/etc/grafana/provisioning/
     env_file: ./observability/grafana/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/login || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.grafana.rule=Host(`${HOST}`)"
@@ -139,6 +151,12 @@ services:
     volumes:
       - ./observability/otel/config.yaml:/etc/otel-collector/config.yaml
     env_file: ./observability/otel/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:${HEALTH_CHECK_PORT:-13133}/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.otel.rule=Host(`${HOST}`)"
@@ -172,6 +190,12 @@ services:
       - beszel-socket:/beszel_socket
     env_file:
       - ./beszel/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.beszel.rule=Host(`${HOST}`)"

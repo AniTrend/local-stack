@@ -75,6 +75,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer-data:/data
     env_file: ./portainer/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:${PORT}/api/status || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.portainer.rule=Host(`${HOST}`)"
@@ -111,6 +117,12 @@ services:
           - apisix-gateway
     env_file:
       - ./apisix/api-gateway/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:${PORT}/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     volumes:
       - ./apisix/api-gateway/config/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
       - apisix-cache:/tmp/apisix-cache/
@@ -141,6 +153,12 @@ services:
           - apisix-dashboard
     env_file:
       - ./apisix/api-dashboard/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:${PORT}/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     volumes:
       - ./apisix/api-dashboard/config/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
     labels:
