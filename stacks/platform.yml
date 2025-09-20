@@ -57,6 +57,49 @@ services:
       - 'traefik.http.routers.growth-proxy.tls=true'
       - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
 
+  anitrend:
+    image: ghcr.io/anitrend/anitrend:0.6.2
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - anitrend
+    command: ["/usr/src/start.sh"]
+    env_file: ./anitrend/.env
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.anitrend-graphql.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.anitrend-graphql.entrypoints=web,websecure"
+      - "traefik.http.routers.anitrend-graphql.service=anitrend-graphql"
+      - "traefik.http.routers.anitrend-graphql.tls=true"
+      - "traefik.http.routers.anitrend-graphql.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.server.port=${PORT}"
+
+  anitrend_edge:
+    image: ghcr.io/anitrend/on-the-edge:0.7.2
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - anitrend-edge
+    env_file: ./on-the-edge/.env
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.anitrend-edge.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.anitrend-edge.entrypoints=web,websecure"
+      - "traefik.http.routers.anitrend-edge.service=anitrend-edge"
+      - "traefik.http.routers.anitrend-edge.tls=true"
+      - "traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}"
+
 networks:
   default:
     name: traefik-public

@@ -148,7 +148,9 @@ services:
   postgres:
     image: postgres:17
     networks:
-      - default
+      default:
+        aliases:
+          - postgres
     volumes:
       - postgres-data:/var/lib/postgresql/data
     env_file: ./postgres/.env
@@ -156,7 +158,9 @@ services:
   mongo:
     image: mongo:8.0.13
     networks:
-      - default
+      default:
+        aliases:
+          - mongo
     env_file:
       - ./mongo/.env
     volumes:
@@ -166,7 +170,9 @@ services:
   redis:
     image: redis:8.2-alpine
     networks:
-      - default
+      default:
+        aliases:
+          - redis
     command: redis-server --appendonly yes
     env_file: ./redis/.env
 
