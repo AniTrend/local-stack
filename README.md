@@ -103,6 +103,47 @@ The observability stack provides full monitoring capabilities through metrics, l
     - Trace to metrics correlation
     - Service graph visualization
 
+### APISIX Logging to Grafana (Loki)
+
+APISIX request/response logs are forwarded directly to Loki using the `loki-logger` plugin configured as a global rule in `apisix/api-gateway/config/apisix.yaml` (`global_rules`). Each request generates a structured JSON log line labeled with:
+
+- `job=apisix`
+- `service` (value from `OTEL_SERVICE_NAME`)
+- `env` (deployment environment)
+- `host` (gateway container hostname)
+- `route` (APISIX route id, if matched)
+
+The custom `log_format` includes trace and span IDs so you can pivot between traces (Tempo) and logs (Loki) in Grafana.
+
+#### Query Examples (Grafana Explore > Loki)
+
+```
+{job="apisix"}
+{job="apisix", status="500"}
+{job="apisix", route="test-anything"}
+{job="apisix"} |= "trace_id"
+```
+
+If you need the full original APISIX log body (request/response objects), remove or comment out the `log_format` section in the global rule to let the plugin emit the default verbose JSON.
+
+#### Including Bodies (Optional)
+You can toggle:
+```
+include_req_body: true
+include_resp_body: true
+```
+Body capture increases memory usage and may omit very large bodies due to Nginx limits—enable only for debugging and consider `include_req_body_expr` filters.
+
+#### Troubleshooting
+1. No logs: Check `docker logs apisix-gateway | grep loki` for batch processor errors.
+2. Connection issues: Ensure `loki` service is running and resolvable inside the `traefik` network.
+3. Labels missing: Verify `global_rules` block loaded (container restart or config reload may be required).
+4. Trace correlation missing: Confirm `set_ngx_var: true` under `plugin_attr.opentelemetry` and that the gateway was restarted after change.
+
+#### Disable or Adjust
+Edit `apisix/api-gateway/config/apisix.yaml` and modify or remove the `global_rules` entry with id `loki-all`, then recreate the APISIX container.
+
+
 ### Security
 
 - TLS encryption via Traefik
