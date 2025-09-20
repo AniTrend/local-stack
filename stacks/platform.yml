@@ -1,0 +1,63 @@
+# Platform stack (Swarm)
+# Services: GrowthBook dashboard + proxy, AniTrend apps/services (to be added)
+
+volumes:
+  growthbook_dashboard-uploads:
+    driver: local
+
+services:
+  growthbook:
+    image: growthbook/growthbook:4.1.0
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - growthbook
+    command: ["yarn", "start:with-tracing"]
+    volumes:
+      - growthbook_dashboard-uploads:/usr/local/src/app/packages/back-end/uploads
+    env_file: ./growthbook/dashboard/.env
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.server.port=${DASHBOARD_PORT}'
+      - 'traefik.http.routers.growth-dashboard.entrypoints=web,websecure'
+      - 'traefik.http.routers.growth-dashboard.service=growth-dashboard'
+      - 'traefik.http.routers.growth-dashboard.tls=true'
+      - 'traefik.http.routers.growth-dashboard.tls.certresolver=${CERT_RESOLVER}'
+      - 'traefik.http.routers.growth-api.rule=Host(`${DASHBOARD_API_HOST}`)'
+      - 'traefik.http.services.growth-api.loadbalancer.server.port=${API_PORT}'
+      - 'traefik.http.routers.growth-api.entrypoints=web,websecure'
+      - 'traefik.http.routers.growth-api.service=growth-api'
+      - 'traefik.http.routers.growth-api.tls=true'
+      - 'traefik.http.routers.growth-api.tls.certresolver=${CERT_RESOLVER}'
+
+  growthbook_proxy:
+    image: growthbook/proxy:git-efec2de
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - growthbook-proxy
+    env_file: ./growthbook/proxy/.env
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
+      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
+      - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
+      - 'traefik.http.routers.growth-proxy.service=growth-proxy'
+      - 'traefik.http.routers.growth-proxy.tls=true'
+      - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
+
+networks:
+  default:
+    name: traefik-public
+    external: true

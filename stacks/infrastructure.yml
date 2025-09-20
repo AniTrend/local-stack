@@ -1,0 +1,176 @@
+# Infrastructure stack (Swarm)
+# NOTE: attach to external overlay network 'traefik-public' created once per swarm host.
+# NOTE: no Compose-only keys (container_name, restart, build) are used.
+
+volumes:
+  traefik-ssl-certs:
+    name: traefik_traefik-ssl-certs
+    external: true
+  portainer-data:
+    name: portainer_portainer-data
+    external: true
+  apisix-cache:
+    name: apisix-cache
+    driver: local
+  etcd-data:
+    name: etcd-data
+    driver: local
+  postgres-data:
+    name: postgres-data
+    driver: local
+  mongo-data:
+    name: mongo_mongo-data
+    driver: local
+
+services:
+  traefik:
+    image: traefik:v3.5
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - traefik
+    ports:
+      - 80:80
+      - 443:443
+    env_file: ./traefik/.env
+    volumes:
+      - traefik-ssl-certs:/etc/traefik/certs
+      - ./traefik/auth/htpasswd:/etc/htpasswd:ro
+      - ./traefik/config/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/config/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.traefik-ui.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.traefik-ui.entrypoints=web,websecure"
+      - "traefik.http.routers.traefik-ui.service=api@internal"
+      - "traefik.http.routers.traefik-ui.middlewares=sso"
+      - "traefik.http.routers.traefik-ui.tls=true"
+      - "traefik.http.routers.traefik-ui.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}"
+      - "traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}"
+      - "traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}"
+      - "traefik.http.services.traefik-ui.loadbalancer.server.port=${PORT}"
+
+  portainer:
+    image: portainer/portainer-ee:2.34.0
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    env_file: ./portainer/.env
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.portainer.rule=Host(`${HOST}`)"
+      - "traefik.http.services.portainer.loadbalancer.server.port=${PORT}"
+      - "traefik.http.routers.portainer.entrypoints=web,websecure"
+      - "traefik.http.routers.portainer.service=portainer"
+      - "traefik.http.routers.portainer.tls=true"
+      - "traefik.http.routers.portainer.tls.certresolver=${CERT_RESOLVER}"
+
+  apisix_etcd:
+    image: bitnami/etcd:3.6.4
+    networks:
+      default:
+        aliases:
+          - apisix-etcd
+    env_file:
+      - ./apisix/etcd/.env
+    volumes:
+      - etcd-data:/bitnami/etcd
+
+  apisix_gateway:
+    image: apache/apisix:3.13.0-debian
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - apisix-gateway
+    env_file:
+      - ./apisix/api-gateway/.env
+    volumes:
+      - ./apisix/api-gateway/config/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - apisix-cache:/tmp/apisix-cache/
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.apisix.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.apisix.entrypoints=web,websecure"
+      - "traefik.http.routers.apisix.service=apisix"
+      - "traefik.http.routers.apisix.tls=true"
+      - "traefik.http.routers.apisix.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.apisix.loadbalancer.server.port=${PORT}"
+    depends_on:
+      - apisix_etcd
+
+  apisix_dashboard:
+    image: apache/apisix-dashboard:3.0.1-alpine
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+    networks:
+      default:
+        aliases:
+          - apisix-dashboard
+    env_file:
+      - ./apisix/api-dashboard/.env
+    volumes:
+      - ./apisix/api-dashboard/config/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.apisix-dashboard.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.apisix-dashboard.entrypoints=web,websecure"
+      - "traefik.http.routers.apisix-dashboard.service=apisix-dashboard"
+      - "traefik.http.routers.apisix-dashboard.tls=true"
+      - "traefik.http.routers.apisix-dashboard.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.apisix-dashboard.loadbalancer.server.port=${PORT}"
+    depends_on:
+      - apisix_gateway
+
+  postgres:
+    image: postgres:17
+    networks:
+      - default
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    env_file: ./postgres/.env
+
+  mongo:
+    image: mongo:8.0.13
+    networks:
+      - default
+    env_file:
+      - ./mongo/.env
+    volumes:
+      - mongo-data:/data/db
+      - mongo-data:/data/configdb
+
+  redis:
+    image: redis:8.2-alpine
+    networks:
+      - default
+    command: redis-server --appendonly yes
+    env_file: ./redis/.env
+
+networks:
+  default:
+    name: traefik-public
+    external: true
