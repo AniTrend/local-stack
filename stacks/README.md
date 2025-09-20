@@ -46,3 +46,23 @@ docker stack rm infrastructure
 - Ensure each service folder has a `.env` copied from its `.env.example` where applicable.
 - APISIX dashboard uses `apisix/api-dashboard/config/conf.yaml` (generated from `conf.example.yml`).
 - Consider adding healthchecks for critical dependencies to improve startup reliability.
+
+## Local HTTPS for *.docker.localhost
+
+For local development with HTTPS on domains like `grafana.docker.localhost`, Traefik is configured with a `local` certificatesResolver and a file provider for TLS certificates.
+
+What this means:
+- ACME/Let’s Encrypt will not issue for `.localhost` domains. Instead, generate a local development certificate and key, and place them in `traefik/certs/` as `local-cert.pem` and `local-key.pem`.
+- The dynamic config (`traefik/config/dynamic.yml`) already references these files and declares the `docker.localhost` SANs, including `*.docker.localhost`.
+- Set `CERT_RESOLVER=local` in `traefik/.env` (and any service labels that reference it) to use the local resolver while Traefik serves the file-based certs.
+
+Generate a dev cert (example using mkcert):
+
+```bash
+mkcert -install
+mkcert -cert-file traefik/certs/local-cert.pem -key-file traefik/certs/local-key.pem "docker.localhost" "*.docker.localhost"
+```
+
+Notes:
+- `traefik/certs/.gitignore` prevents committing private keys or ACME storage files.
+- Browsers trust mkcert’s local CA after `mkcert -install`. If not using mkcert, you may need to trust your self-signed CA manually.
