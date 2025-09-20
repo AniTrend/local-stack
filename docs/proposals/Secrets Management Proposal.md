@@ -1,6 +1,6 @@
 # Secrets Management Proposal (Docker Swarm + Portainer)
 
-Author: Infra
+Target: Infra
 Status: Proposal
 Date: 2025-09-20
 
