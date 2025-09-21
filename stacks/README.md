@@ -41,6 +41,42 @@ docker stack rm observability
 docker stack rm infrastructure
 ```
 
+### Using stackctl.sh (recommended)
+
+The repo includes a helper script at the root, `./stackctl.sh`, which wraps the common lifecycle with preflight checks and nicer ergonomics.
+
+Prerequisites:
+- Docker Engine with Swarm enabled (single-node is fine)
+- The external overlay network `traefik-public`
+- Optional: local TLS certs in `traefik/certs/` for `*.docker.localhost`
+
+Quick start:
+
+```bash
+# Validate your environment (safe to run repeatedly). Add --fix-network to auto-create the overlay network.
+./stackctl.sh doctor --fix-network
+
+# Deploy all stacks and follow key logs (Traefik, Prometheus, Loki)
+./stackctl.sh up
+
+# Or deploy a subset
+./stackctl.sh up -s infrastructure,observability
+
+# Check status
+./stackctl.sh status
+
+# Tail logs for specific services
+./stackctl.sh logs infrastructure_traefik observability_prometheus
+
+# Remove stacks (keeps volumes); add --remove-network to also remove traefik-public
+./stackctl.sh down -y
+```
+
+Notes:
+- `stackctl.sh` finds stack files from either `stacks/*.yml` or the repo root (`infrastructure.yml`, etc.).
+- The `doctor` command validates Compose syntax for each stack and reminds you to create `.env` files where a `.env.example` exists.
+- If you use local HTTPS, make sure `traefik/certs/local-cert.pem` and `traefik/certs/local-key.pem` exist; see below for generation.
+
 ## Notes
 
 - Ensure each service folder has a `.env` copied from its `.env.example` where applicable.

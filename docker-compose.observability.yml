@@ -3,17 +3,29 @@
 
 volumes:
   prometheus-data:
+    name: prometheus-data
     driver: local
+    external: true
   grafana-data:
+    name: grafana-data
     driver: local
+    external: true
   loki-data:
+    name: loki-data
     driver: local
+    external: true
   tempo-data:
+    name: tempo-data
     driver: local
+    external: true
   beszel-data:
+    name: beszel-data
     driver: local
+    external: true
   beszel-socket:
+    name: beszel-socket
     driver: local
+    external: true
 
 services:
   prometheus:

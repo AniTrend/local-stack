@@ -3,7 +3,9 @@
 
 volumes:
   growthbook_dashboard-uploads:
+    name: growthbook_dashboard-uploads
     driver: local
+    external: true
 
 services:
   growthbook:
