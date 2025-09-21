@@ -28,11 +28,20 @@ volumes:
 services:
   traefik:
     image: traefik:v3.5
+    command:
+      - --accesslog=false
     deploy:
       mode: global
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 512M
+          cpus: '0.50'
     networks:
       default:
         aliases:
@@ -62,6 +71,11 @@ services:
       - "traefik.http.services.traefik-ui.loadbalancer.healthcheck.path=/dashboard/"
       - "traefik.http.services.traefik-ui.loadbalancer.healthcheck.interval=5s"
       - "traefik.http.services.traefik-ui.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   portainer:
     image: portainer/portainer-ee:2.34.0
@@ -70,6 +84,13 @@ services:
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 512M
+          cpus: '0.50'
     networks:
       default:
         aliases:
@@ -95,6 +116,11 @@ services:
       - "traefik.http.services.portainer.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.portainer.loadbalancer.healthcheck.interval=5s"
       - "traefik.http.services.portainer.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   apisix_etcd:
     image: bitnami/etcd:3.6.4
@@ -104,8 +130,22 @@ services:
           - apisix-etcd
     env_file:
       - ./apisix/etcd/.env
+    environment:
+      - ETCD_AUTO_COMPACTION_RETENTION=1
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
     volumes:
       - etcd-data:/bitnami/etcd
+    deploy:
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   apisix_gateway:
     image: apache/apisix:3.13.0-debian
@@ -114,6 +154,13 @@ services:
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.40'
     networks:
       default:
         aliases:
@@ -142,6 +189,11 @@ services:
       - "traefik.http.services.apisix.loadbalancer.healthcheck.timeout=2s"
     depends_on:
       - apisix_etcd
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   apisix_dashboard:
     image: apache/apisix-dashboard:3.0.1-alpine
@@ -150,6 +202,11 @@ services:
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
     networks:
       default:
         aliases:
@@ -177,6 +234,11 @@ services:
       - "traefik.http.services.apisix-dashboard.loadbalancer.healthcheck.timeout=2s"
     depends_on:
       - apisix_gateway
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   postgres:
     image: postgres:17
@@ -193,6 +255,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        reservations:
+          memory: 128M
+        limits:
+          memory: 512M
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   mongo:
     image: mongo:8.0.13
@@ -211,6 +284,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+        limits:
+          memory: 800M
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:8.2-alpine
@@ -226,6 +310,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        reservations:
+          memory: 32M
+        limits:
+          memory: 128M
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:

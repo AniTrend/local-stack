@@ -9,10 +9,18 @@ services:
   growthbook:
     image: growthbook/growthbook:4.1.0
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 256M
+          cpus: '0.20'
+        limits:
+          memory: 800M
+          cpus: '0.80'
     networks:
       default:
         aliases:
@@ -21,6 +29,8 @@ services:
     volumes:
       - growthbook_dashboard-uploads:/usr/local/src/app/packages/back-end/uploads
     env_file: ./growthbook/dashboard/.env
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=512
     healthcheck:
       test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$DASHBOARD_PORT/ && curl -sS -o /dev/null http://127.0.0.1:$API_PORT/ || exit 1"]
       interval: 15s
@@ -47,14 +57,25 @@ services:
       - 'traefik.http.routers.growth-api.service=growth-api'
       - 'traefik.http.routers.growth-api.tls=true'
       - 'traefik.http.routers.growth-api.tls.certresolver=${CERT_RESOLVER}'
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   growthbook_proxy:
     image: growthbook/proxy:git-efec2de
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
     networks:
       default:
         aliases:
@@ -79,14 +100,27 @@ services:
       - 'traefik.http.routers.growth-proxy.service=growth-proxy'
       - 'traefik.http.routers.growth-proxy.tls=true'
       - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   anitrend:
     image: ghcr.io/anitrend/anitrend:0.6.2
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
     networks:
       default:
         aliases:
@@ -110,14 +144,27 @@ services:
       - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.interval=5s"
       - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   anitrend_edge:
     image: ghcr.io/anitrend/on-the-edge:0.7.2
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
     networks:
       default:
         aliases:
@@ -140,6 +187,11 @@ services:
       - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.interval=5s"
       - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:

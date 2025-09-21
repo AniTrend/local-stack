@@ -47,6 +47,25 @@ docker stack rm infrastructure
 - APISIX dashboard uses `apisix/api-dashboard/config/conf.yaml` (generated from `conf.example.yml`).
 - Consider adding healthchecks for critical dependencies to improve startup reliability.
 
+### Resource caps & logging
+
+- Stacks set conservative `deploy.resources` reservations/limits to avoid runaway memory/CPU. Adjust in ±128–256MiB steps based on telemetry.
+- Services use the `local` logging driver with rotation (`max-size=10m`, `max-file=3`) to reduce JSON log churn. If you prefer a global default, set it in `/etc/docker/daemon.json` and restart Docker.
+
+### Tuning highlights
+
+- Prometheus: 3d retention (`--storage.tsdb.retention.time=3d`), `--query.max-concurrency=10`; scrape intervals relaxed to 30s for most jobs.
+- Loki: retention 72h, chunk target ~1.5MiB, moderate ingestion rate, compactor retention enabled.
+- Tempo: local backend with 48h retention from config; single-replica by default.
+- GrowthBook: Node heap capped via `NODE_OPTIONS=--max-old-space-size=512`.
+- Traefik: access logs disabled by default; enable temporarily if debugging.
+
+### Troubleshooting
+
+- Verify per-stack services: `docker stack services <stack>` and `docker service logs <stack>_<service>`.
+- If Traefik can't reach a service, confirm it's attached to `traefik-public` and labels point to the correct `server.port` and host.
+- For noisy logs or high disk writes, ensure the `local` driver is in effect and service-level logging options are applied.
+
 ## Local HTTPS for *.docker.localhost
 
 For local development with HTTPS on domains like `grafana.docker.localhost`, Traefik is configured with a `local` certificatesResolver and a file provider for TLS certificates.

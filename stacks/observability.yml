@@ -19,12 +19,20 @@ services:
   prometheus:
     image: prom/prometheus:v2.55.1
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
       restart_policy:
         condition: any
+      resources:
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+        limits:
+          memory: 1200M
+          cpus: '0.80'
     networks:
       default:
         aliases:
@@ -34,6 +42,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.size=${STORAGE_TSDB_RETENTION_SIZE}'
       - '--web.enable-remote-write-receiver'
+      - '--storage.tsdb.retention.time=3d'
+      - '--query.max-concurrency=10'
     volumes:
       - ./observability/prometheus/config/:/etc/prometheus/
       - prometheus-data:/prometheus
@@ -56,16 +66,27 @@ services:
       - "traefik.http.services.prometheus.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.prometheus.loadbalancer.healthcheck.interval=5s"
       - "traefik.http.services.prometheus.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   loki:
     image: grafana/loki:3.5.5
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
       restart_policy:
         condition: any
+      resources:
+        reservations:
+          memory: 256M
+        limits:
+          memory: 800M
     networks:
       default:
         aliases:
@@ -75,16 +96,27 @@ services:
       - ./observability/loki/config.yaml:/etc/loki/config.yaml
       - loki-data:/loki
     env_file: ./observability/loki/.env
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   tempo:
     image: grafana/tempo:2.8.2
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
       restart_policy:
         condition: any
+      resources:
+        reservations:
+          memory: 256M
+        limits:
+          memory: 600M
     networks:
       default:
         aliases:
@@ -94,16 +126,27 @@ services:
       - ./observability/tempo/tempo.yaml:/etc/tempo/config.yaml
       - tempo-data:/var/tempo
     env_file: ./observability/tempo/.env
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   grafana:
     image: grafana/grafana-oss:12.1.1
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
       restart_policy:
         condition: any
+      resources:
+        reservations:
+          memory: 128M
+        limits:
+          memory: 512M
     networks:
       default:
         aliases:
@@ -133,16 +176,29 @@ services:
       - prometheus
       - loki
       - tempo
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.135.0
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
       restart_policy:
         condition: any
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.40'
     networks:
       default:
         aliases:
@@ -173,14 +229,25 @@ services:
       - loki
       - tempo
       - prometheus
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   beszel:
     image: henrygd/beszel:0.12.9
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
     networks:
       default:
         aliases:
@@ -207,14 +274,25 @@ services:
       - "traefik.http.services.beszel.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.beszel.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.beszel.loadbalancer.healthcheck.timeout=3s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   beszel-agent:
     image: henrygd/beszel-agent:0.12.9
     deploy:
-      mode: global
+      mode: replicated
+      replicas: 1
       placement:
         constraints:
           - node.role == manager
+      resources:
+        reservations:
+          memory: 32M
+        limits:
+          memory: 96M
     networks:
       default:
         aliases:
@@ -224,6 +302,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     env_file:
       - ./beszel/.env
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:
