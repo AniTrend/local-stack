@@ -450,7 +450,8 @@ cmd_up() {
 		if [[ "$DRY_RUN" = true ]]; then
 			log "DRY-RUN: would run: docker stack deploy -c $render_file $stack"
 			log "DRY-RUN: validating compose file: $render_file"
-			compose_config "$render_file" || true
+			# Suppress the full rendered YAML output; keep warnings/errors on stderr visible
+			compose_config "$render_file" >/dev/null || true
 		else
 			log "Deploying stack: $stack (file: $render_file)"
 			docker stack deploy -c "$render_file" "$stack"
@@ -585,12 +586,15 @@ cmd_logs() {
 
 cmd_doctor() {
 	local FIX_NETWORK=false
+	local FIX_VOLUMES=false
 	while [[ $# -gt 0 ]]; do
 		case "${1:-}" in
 			--fix-network)
 				FIX_NETWORK=true; shift ;;
+			--fix-volumes)
+				FIX_VOLUMES=true; shift ;;
 			-h|--help)
-				log "Run preflight checks. Options: --fix-network (create traefik-public if missing)"; exit 0 ;;
+				log "Run preflight checks. Options: --fix-network (create traefik-public if missing), --fix-volumes (create missing external named volumes)"; exit 0 ;;
 			--)
 				shift; break ;;
 			-*)
@@ -633,10 +637,57 @@ cmd_doctor() {
 			# Attempt to render first for accurate validation
 			local rendered
 			rendered="$(render_compose_file "$file_path")"
+			local validated=false
 			if compose_config "$rendered" >/dev/null 2>&1; then
 				log "OK: '$stack' compose syntax valid (validated: $rendered)"
+				validated=true
 			else
 				err "Validation failed for '$stack' ($rendered)"
+			fi
+
+			# Optionally ensure external named volumes exist
+			if [[ "$FIX_VOLUMES" = true ]]; then
+				# Extract external named volumes from the rendered file (best-effort awk/yq-less parsing)
+				# Look for pattern under top-level volumes: name: <name> and external: true
+				# This is a heuristic and may miss exotic YAML, but works for our stacks.
+				local vol_names
+				vol_names=$(awk '
+				  /^volumes:/ {invol=1; next}
+				  invol==1 && /^[^[:space:]]/ {invol=0}
+				  invol==1 {
+				    if ($0 ~ /^[[:space:]]{2,}[A-Za-z0-9_-]+:$/) {
+				      if (keyname != "" && ext == 1) {
+				        if (volname != "") print volname; else print keyname;
+				      }
+				      keyname=$1; sub(":", "", keyname); volname=""; ext=0;
+				    } else if ($1 == "name:") {
+				      volname=$2;
+				    } else if ($1 == "external:" && $2 ~ /true/) {
+				      ext=1;
+				    }
+				  }
+				  END { if (keyname != "" && ext == 1) { if (volname != "") print volname; else print keyname; } }
+				' "$rendered") || true
+				if [[ -n "$vol_names" ]]; then
+					while IFS= read -r vol; do
+						[[ -z "$vol" ]] && continue
+						if docker volume ls --format '{{.Name}}' | grep -qx "$vol"; then
+							log "OK: external volume exists: $vol"
+						else
+							log "Creating missing external volume: $vol"
+							docker volume create "$vol" >/dev/null 2>&1 || log "Warning: failed to create volume $vol"
+						fi
+					done <<< "$vol_names"
+				fi
+			fi
+			# Re-validate after creating volumes if initial validation failed
+			if [[ "$FIX_VOLUMES" = true && "$validated" = false ]]; then
+				if compose_config "$rendered" >/dev/null 2>&1; then
+					log "OK: '$stack' compose syntax valid after fixing volumes (validated: $rendered)"
+					validated=true
+				fi
+			fi
+			if [[ "$validated" = false ]]; then
 				overall_ok=false
 			fi
 		else

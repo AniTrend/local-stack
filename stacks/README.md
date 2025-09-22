@@ -56,6 +56,9 @@ Quick start:
 # Validate your environment (safe to run repeatedly). Add --fix-network to auto-create the overlay network.
 ./stackctl.sh doctor --fix-network
 
+# Optionally ensure external named volumes exist before deploying
+./stackctl.sh doctor --fix-volumes
+
 # Deploy all stacks and follow key logs (Traefik, Prometheus, Loki)
 ./stackctl.sh up
 

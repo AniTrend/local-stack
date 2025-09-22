@@ -140,6 +140,65 @@ def build_service_scope_vars(
     return vars_map
 
 
+def absolutize_service_paths(service: Dict[str, Any], project_dir: str, repo_root: Optional[str]) -> None:
+    """Rewrite env_file and bind-mount host paths to absolute paths so that the rendered YAML
+    can be placed outside the original project directory (e.g., under ./.rendered) without
+    breaking relative references.
+    """
+    def to_abs(path: str) -> str:
+        # First try relative to project_dir, then repo_root
+        if os.path.isabs(path):
+            return path
+        # Normalize ./
+        rel = path[2:] if path.startswith("./") else path
+        cand = os.path.normpath(os.path.join(project_dir, rel))
+        if os.path.exists(cand):
+            return cand
+        if repo_root:
+            cand2 = os.path.normpath(os.path.join(repo_root, rel))
+            if os.path.exists(cand2):
+                return cand2
+        # If it doesn't exist, still prefer a repo-root-anchored path for env_file
+        return os.path.normpath(os.path.join(repo_root or project_dir, rel))
+
+    # env_file: string or list
+    if "env_file" in service:
+        ef = service.get("env_file")
+        if isinstance(ef, str):
+            service["env_file"] = to_abs(ef)
+        elif isinstance(ef, list):
+            service["env_file"] = [to_abs(x) if isinstance(x, str) else x for x in ef]
+
+    # volumes: list of strings or dictionaries
+    vols = service.get("volumes")
+    if isinstance(vols, list):
+        new_vols = []
+        for v in vols:
+            if isinstance(v, str):
+                # Format: src:dest[:mode]
+                parts = v.split(":")
+                if len(parts) >= 2:
+                    src = parts[0]
+                    # Heuristic: if src looks like a path (has '/' or starts with '.'), absolutize. Named volumes have no '/'
+                    if src.startswith(".") or src.startswith("/") or "/" in src:
+                        # Do not change named volumes (no '/')
+                        if "/" in src or src.startswith(".") or src.startswith("/"):
+                            src_abs = to_abs(src)
+                            parts[0] = src_abs
+                            v = ":".join(parts)
+                new_vols.append(v)
+            elif isinstance(v, dict):
+                vtype = v.get("type")
+                if vtype == "bind":
+                    src = v.get("source")
+                    if isinstance(src, str):
+                        v["source"] = to_abs(src)
+                new_vols.append(v)
+            else:
+                new_vols.append(v)
+        service["volumes"] = new_vols
+
+
 def substitute(s: str, vars_map: Mapping[str, str]) -> str:
     """Perform ${VAR}, ${VAR-default}, ${VAR:-default} substitution.
     Unresolved variables are left as-is.
@@ -206,6 +265,8 @@ def render_compose(data: Dict[str, Any], project_dir: str, repo_root: Optional[s
         if not isinstance(svc, dict):
             rendered_services[name] = svc
             continue
+        # Make service file paths absolute so rendered YAML can be used from a different directory
+        absolutize_service_paths(svc, project_dir, repo_root)
         scope_vars = build_service_scope_vars(svc, base_env, project_dir, repo_root)
         rendered_services[name] = deep_interpolate(svc, scope_vars)
 
