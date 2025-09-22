@@ -1,0 +1,200 @@
+# Platform stack (Swarm)
+# Services: GrowthBook dashboard + proxy, AniTrend apps/services (to be added)
+
+volumes:
+  growthbook_dashboard-uploads:
+    name: growthbook_dashboard-uploads
+    external: true
+
+services:
+  growthbook:
+    image: growthbook/growthbook:4.1.0
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 256M
+          cpus: '0.20'
+        limits:
+          memory: 800M
+          cpus: '0.80'
+    networks:
+      default:
+        aliases:
+          - growthbook
+    command: ["yarn", "start:with-tracing"]
+    volumes:
+      - growthbook_dashboard-uploads:/usr/local/src/app/packages/back-end/uploads
+    env_file: ./growthbook/dashboard/.env
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=512
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$DASHBOARD_PORT/ && curl -sS -o /dev/null http://127.0.0.1:$API_PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.server.port=${DASHBOARD_PORT}'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.healthcheck.path=/'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.healthcheck.interval=5s'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.healthcheck.timeout=2s'
+      - 'traefik.http.routers.growth-dashboard.entrypoints=web,websecure'
+      - 'traefik.http.routers.growth-dashboard.service=growth-dashboard'
+      - 'traefik.http.routers.growth-dashboard.tls=true'
+      - 'traefik.http.routers.growth-dashboard.tls.certresolver=${CERT_RESOLVER}'
+      - 'traefik.http.routers.growth-api.rule=Host(`${DASHBOARD_API_HOST}`)'
+      - 'traefik.http.services.growth-api.loadbalancer.server.port=${API_PORT}'
+      - 'traefik.http.services.growth-api.loadbalancer.healthcheck.path=/'
+      - 'traefik.http.services.growth-api.loadbalancer.healthcheck.interval=5s'
+      - 'traefik.http.services.growth-api.loadbalancer.healthcheck.timeout=2s'
+      - 'traefik.http.routers.growth-api.entrypoints=web,websecure'
+      - 'traefik.http.routers.growth-api.service=growth-api'
+      - 'traefik.http.routers.growth-api.tls=true'
+      - 'traefik.http.routers.growth-api.tls.certresolver=${CERT_RESOLVER}'
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  growthbook_proxy:
+    image: growthbook/proxy:git-efec2de
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
+    networks:
+      default:
+        aliases:
+          - growthbook-proxy
+    depends_on:
+      - growthbook
+    env_file: ./growthbook/proxy/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
+      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
+      - 'traefik.http.services.growth-proxy.loadbalancer.healthcheck.path=/'
+      - 'traefik.http.services.growth-proxy.loadbalancer.healthcheck.interval=5s'
+      - 'traefik.http.services.growth-proxy.loadbalancer.healthcheck.timeout=2s'
+      - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
+      - 'traefik.http.routers.growth-proxy.service=growth-proxy'
+      - 'traefik.http.routers.growth-proxy.tls=true'
+      - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  anitrend:
+    image: ghcr.io/anitrend/anitrend:0.6.2
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
+    networks:
+      default:
+        aliases:
+          - anitrend
+    command: ["/usr/src/start.sh"]
+    env_file: ./anitrend/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.anitrend-graphql.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.anitrend-graphql.entrypoints=web,websecure"
+      - "traefik.http.routers.anitrend-graphql.service=anitrend-graphql"
+      - "traefik.http.routers.anitrend-graphql.tls=true"
+      - "traefik.http.routers.anitrend-graphql.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.anitrend-graphql.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  anitrend_edge:
+    image: ghcr.io/anitrend/on-the-edge:0.7.2
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
+    networks:
+      default:
+        aliases:
+          - anitrend-edge
+    env_file: ./on-the-edge/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.anitrend-edge.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.anitrend-edge.entrypoints=web,websecure"
+      - "traefik.http.routers.anitrend-edge.service=anitrend-edge"
+      - "traefik.http.routers.anitrend-edge.tls=true"
+      - "traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.anitrend-edge.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik-public
+    external: true

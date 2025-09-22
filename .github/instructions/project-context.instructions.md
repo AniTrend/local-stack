@@ -1,9 +1,9 @@
 ---
 applyTo: **
-description: This document provides an overview of the Local-Stack project, its structure, service configurations, common tasks, and best practices for local development infrastructure using Docker Compose.
+description: Overview of Local-Stack, its structure, and the migration from multi-Compose to modular Docker Swarm stacks (infrastructure, observability, platform).
 ---
 ## Project Overview
-Local-Stack is a comprehensive local development infrastructure built with Docker Compose. It provides a collection of services commonly needed for application development including databases, API gateways, observability tools, reverse proxies, and more. This environment allows developers to run and test applications with a production-like infrastructure locally.
+Local-Stack is a comprehensive local development infrastructure. Historically it used multiple Docker Compose files per service; we are migrating to modular Docker Swarm stacks for declarative, single-command deployment across local and remote hosts. The stack includes databases, API gateways, observability tools, reverse proxies, and more, enabling production-like workflows locally.
 
 ## Project Structure
 The project is organized into directories, each containing docker-compose files for different services:
@@ -12,8 +12,8 @@ The project is organized into directories, each containing docker-compose files 
 local-stack/
 ├── LICENSE
 ├── README.md
-├── swarm.infrastructure.yml     # Docker Swarm configuration for infrastructure
-├── swarm.observerability.yml    # Docker Swarm configuration for observability
+├── swarm.infrastructure.yml     # Deprecated initial Swarm attempt (do not use)
+├── swarm.observerability.yml    # Deprecated initial Swarm attempt (do not use)
 ├── anitrend/                    # AniTrend application specific configs
 ├── apisix/                      # API Gateway services
 │   ├── api-dashboard/           # APISIX Dashboard
@@ -151,22 +151,46 @@ All services are exposed through Traefik and accessible via subdomains:
 - `https://growthbook.localhost` - GrowthBook
 
 ## Docker Swarm Deployment
+We are migrating to three modular Swarm stacks. New stack files will live under `stacks/`:
+- `stacks/infrastructure.yml`: Traefik, Portainer, APISIX (gateway, etcd, dashboard), Postgres, Mongo, Redis
+- `stacks/observability.yml`: Prometheus, Grafana, Loki, Tempo, OTel Collector
+- `stacks/platform.yml`: GrowthBook (dashboard, proxy), AniTrend apps/services, others
 
-The project includes Docker Swarm configuration files:
-- `swarm.infrastructure.yml`: Core infrastructure services
-- `swarm.observerability.yml`: Monitoring stack
+Shared network:
+- All stacks attach to an external overlay network named `traefik-public`. Create it once per Swarm: `docker network create --driver=overlay --attachable traefik-public`.
 
-Deployment commands:
+Key Swarm conventions:
+- Remove Compose-only keys (`container_name`, `restart`, `build`). Use `deploy` for mode, placement, resources, and restart policy.
+- Use `env_file` for per-service configuration; consider Docker secrets/config for sensitive values.
+- Use named volumes; mark as `external: true` to reuse existing data (e.g., Traefik certs, Portainer data, databases).
+- `depends_on` provides order hints only; prefer healthchecks for readiness where critical.
+
+Initial runbook (single-node Swarm):
 ```bash
-# Initialize swarm
+# 1) Initialize Swarm (idempotent)
 docker swarm init
 
-# Deploy infrastructure stack
-docker stack deploy -c swarm.infrastructure.yml infrastructure
+# 2) Create shared network (idempotent)
+docker network create --driver=overlay --attachable traefik-public
 
-# Deploy observability stack
-docker stack deploy -c swarm.observerability.yml observability
+# 3) Deploy stacks (names are identifiers)
+docker stack deploy -c stacks/infrastructure.yml infrastructure
+docker stack deploy -c stacks/observability.yml observability
+docker stack deploy -c stacks/platform.yml platform
+
+# 4) Verify
+docker stack services infrastructure
+docker stack services observability
+docker stack services platform
+
+# 5) Teardown (keeps volumes)
+docker stack rm platform
+docker stack rm observability
+docker stack rm infrastructure
 ```
+
+Deprecated:
+- Root-level `swarm.*.yml` files are deprecated and retained only for reference. Do not use them for deployments.
 
 ## Best Practices
 
@@ -176,12 +200,49 @@ docker stack deploy -c swarm.observerability.yml observability
 - Use the Portainer UI for visual container management
 - Configure proper resource limits in Docker Compose files
 
+Swarm-specific:
+- Prefer `deploy.mode: global` for singletons (e.g., Traefik, Portainer) and `placement.constraints` such as `node.role == manager` for core infra.
+- For scalable/stateless components, use `deploy.mode: replicated` with `replicas`.
+- Attach all exposed services to the `traefik-public` overlay network for routing.
+
 ## Common Issues and Solutions
 
 1. **DNS Resolution**: Add proper DNS entries to `/etc/hosts` for local development
 2. **SSL Certificates**: Generate self-signed certificates for development
 3. **Service Startup Order**: Use `depends_on` in Docker Compose for dependent services
 4. **Data Persistence**: Configure volumes properly to prevent data loss
+
+Swarm migration tips:
+- If a stack deploy fails with "unsupported options" errors, remove Compose-only keys and ensure images are pre-built or in a registry (no `build:` in stacks).
+- If Traefik cannot route to services, confirm the service has labels and is attached to `traefik-public`.
+- Re-run `docker stack deploy` after editing stack files; Swarm will apply changes in place.
+
+## Component-to-Stack Mapping (implementation guide)
+
+- Infrastructure stack (`stacks/infrastructure.yml`)
+  - Traefik: attach to `traefik-public`; mount certs volume; keep existing labels; expose 80/443; manager-only, global.
+  - Portainer: attach to `traefik-public`; mount data volume; label for UI route; manager-only, global.
+  - APISIX Gateway: attach to `traefik-public`; mount config; labels for admin/UI as applicable; depends on etcd.
+  - APISIX etcd: persistent volume for data; internal only; depended on by gateway and dashboard.
+  - APISIX Dashboard: attach to `traefik-public`; labels for route; depends on gateway and Traefik (order only).
+  - Postgres/Mongo/Redis: persistent named volumes; internal only (no Traefik labels) unless explicitly needed; manager-only, global or replicated=1.
+
+- Observability stack (`stacks/observability.yml`)
+  - Prometheus: mount config dir and data volume; labels for route; manager-only, global.
+  - Grafana: mount data volume and provisioning; labels for route; depends_on prometheus/loki/tempo.
+  - Loki: mount data volume; internal port only; optional route via labels if UI enabled.
+  - Tempo: mount data volume; internal ports; optional route.
+  - OTel Collector: mount config; depends_on loki/tempo/prometheus; internal only.
+
+- Platform stack (`stacks/platform.yml`)
+  - GrowthBook Dashboard: attach to `traefik-public`; labels for route; env_file; persistent volume if used.
+  - GrowthBook Proxy: attach to `traefik-public`; labels; env_file.
+  - AniTrend apps/services: attach to `traefik-public` if exposed; labels per route; env_file; prefer replicated for stateless services.
+
+Conventions
+- Networks: every exposed service must attach to the external `traefik-public` network.
+- Volumes: define at top-level; mark `external: true` when reusing existing data (e.g., `traefik-ssl-certs`, `portainer-data`, database volumes).
+- Env: load `env_file` from the corresponding service folder to keep configuration centralized.
 
 ## License
 
