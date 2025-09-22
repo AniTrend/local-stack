@@ -3,3 +3,7 @@ data
 htpasswd
 *.log
 *.pem
+.rendered/
+*.rendered.yml
+.venv/
+__pycache__/

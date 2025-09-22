@@ -18,6 +18,7 @@ Commands:
 	status		List services for each stack
 	logs		Follow logs for key services or specified services
 	doctor		Run preflight checks and optional fixes
+	env		List or recreate .env files from .env.example (safe-guarded)
 	help		Show this help message and exit
 
 Examples:
@@ -37,7 +38,7 @@ err() { log "ERROR: $*"; }
 
 # Determine repository root (directory containing this script)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-STACKS_DIR="$SCRIPT_DIR/stacks"
+STACKS_DIR="$SCRIPT_DIR"
 
 check_command() {
 	command -v "$1" >/dev/null 2>&1 || { err "'$1' is required but not installed or not on PATH"; exit 2; }
@@ -56,14 +57,39 @@ compose_config() {
 	fi
 }
 
-# Find a stack file by name with common fallbacks (stacks/ and repo root, .yml/.yaml)
+# Render a compose file with per-service env interpolation using tools/render_compose.py
+render_compose_file() {
+	local in_file="$1"
+	local out_dir out_file base base_no_ext
+	# Allow override via RENDER_DIR, default to repo-local hidden folder
+	out_dir="${RENDER_DIR:-$SCRIPT_DIR/.rendered}"
+	mkdir -p "$out_dir"
+	base="$(basename "$in_file")"
+	base_no_ext="${base%.yml}"
+	base_no_ext="${base_no_ext%.yaml}"
+	out_file="$out_dir/${base_no_ext}.rendered.yml"
+
+	if command -v python3 >/dev/null 2>&1; then
+		if python3 "$SCRIPT_DIR/tools/render_compose.py" -i "$in_file" -o "$out_file" >/dev/null 2>&1; then
+			printf '%s\n' "$out_file"
+			return 0
+		else
+			log "Warning: compose render failed for $in_file; using original file"
+		fi
+	else
+		log "Warning: python3 not found; skipping compose render for $in_file"
+	fi
+	printf '%s\n' "$in_file"
+}
+
+# Find a stack file by name with common fallbacks (.yml/.yaml in repo root)
 find_stack_file() {
 	local name="$1"
 	local candidates=(
-		"$STACKS_DIR/${name}.yml"
-		"$STACKS_DIR/${name}.yaml"
-		"$SCRIPT_DIR/${name}.yml"
-		"$SCRIPT_DIR/${name}.yaml"
+		"$STACKS_DIR/docker-compose.${name}.yml"
+		"$STACKS_DIR/docker-compose.${name}.yaml"
+		"$SCRIPT_DIR/docker-compose.${name}.yml"
+		"$SCRIPT_DIR/docker-compose.${name}.yaml"
 	)
 	for f in "${candidates[@]}"; do
 		if [[ -f "$f" ]]; then
@@ -106,6 +132,7 @@ DEFAULT_LOG_SERVICES=(observability_prometheus observability_loki infrastructure
 # Selected stacks (defaults to all unless overridden via -s/--stacks)
 TARGET_STACKS=()
 
+# Parse a comma-separated stacks list and validate
 set_target_stacks() {
 	local arg="${1:-}"
 	local tokens=()
@@ -113,7 +140,6 @@ set_target_stacks() {
 	read -r -a tokens <<< "$arg"
 	local parsed=()
 	for t in "${tokens[@]}"; do
-		# trim whitespace
 		t="${t//[[:space:]]/}"
 		[[ -z "$t" ]] && continue
 		local valid=false
@@ -134,6 +160,236 @@ set_target_stacks() {
 		exit 2
 	fi
 	TARGET_STACKS=("${parsed[@]}")
+}
+
+# Discover directories containing a .env.example (portable across macOS/Linux)
+discover_env_example_dirs() {
+	local found=()
+	while IFS= read -r path; do
+		[[ -z "$path" ]] && continue
+		local dir
+		dir="$(dirname "$path")"
+		found+=("$dir")
+	done < <( (find "$SCRIPT_DIR" -type f -name '.env.example' 2>/dev/null) || true )
+
+	if [[ ${#found[@]} -gt 0 ]]; then
+		printf '%s\n' "${found[@]}" | awk '!x[$0]++' | sort
+	fi
+}
+
+# Parse comma-separated user-provided paths and normalize to absolute directories
+parse_env_paths() {
+	local input="$1"
+	local IFS=','
+	read -r -a toks <<< "$input"
+	local out=()
+	for p in "${toks[@]}"; do
+		p="${p//[[:space:]]/}"
+		[[ -z "$p" ]] && continue
+		local abs
+		if [[ -d "$SCRIPT_DIR/$p" ]]; then
+			abs="$(cd "$SCRIPT_DIR/$p" && pwd)"
+		elif [[ -f "$SCRIPT_DIR/$p" ]]; then
+			abs="$(cd "$(dirname "$SCRIPT_DIR/$p")" && pwd)"
+		else
+			if [[ -d "$p" ]]; then
+				abs="$(cd "$p" && pwd)"
+			elif [[ -f "$p" ]]; then
+				abs="$(cd "$(dirname "$p")" && pwd)"
+			else
+				err "Path not found: $p"
+				continue
+			fi
+		fi
+		out+=("$abs")
+	done
+	if [[ ${#out[@]} -gt 0 ]]; then
+		printf '%s\n' "${out[@]}" | awk '!x[$0]++'
+	fi
+}
+
+backup_file() {
+	local file="$1"
+	local ts
+	ts="$(date +%Y%m%d%H%M%S)"
+	local backup="${file}.bak.${ts}"
+	cp -p "$file" "$backup"
+	printf '%s' "$backup"
+}
+
+cmd_env() {
+	local DO_LIST=false
+	local DO_RECREATE=false
+	local FORCE=false
+	local ASSUME_YES=false
+	local DRY_RUN=false
+	local PATHS=""
+
+	# Summary accumulators
+	local total=0
+	local have_env=0
+	local missing_env=0
+	local skipped_no_example=0
+	local created_count=0
+	local overwritten_count=0
+	local skipped_exists_count=0
+	local missing_example_count=0
+	local -a missing_env_list=()
+	local -a skipped_list=()
+	local -a created_list=()
+	local -a overwritten_list=()
+	local -a backup_list=()
+	local -a skipped_exists_list=()
+	local -a missing_example_list=()
+
+	while [[ $# -gt 0 ]]; do
+		case "${1:-}" in
+			--list)
+				DO_LIST=true; shift ;;
+			--recreate)
+				DO_RECREATE=true; shift ;;
+			--paths)
+				[[ $# -lt 2 ]] && { err "--paths requires a comma-separated list of dirs/files"; exit 2; }
+				PATHS="${2:-}"; shift 2 ;;
+			-f|--force)
+				FORCE=true; shift ;;
+			-y|--yes)
+				ASSUME_YES=true; shift ;;
+			--dry-run)
+				DRY_RUN=true; shift ;;
+			-h|--help)
+				log "Manage .env files from .env.example. Options: --list, --recreate, --paths <dirs>, -f/--force, -y/--yes, --dry-run"; exit 0 ;;
+			--)
+				shift; break ;;
+			-*)
+				printf '%s: unknown option for env: %s\n' "$SCRIPT_NAME" "$1" >&2; exit 2 ;;
+			*)
+				break ;;
+		esac
+	done
+
+	if [[ "$DO_LIST" = false && "$DO_RECREATE" = false ]]; then
+		DO_LIST=true
+	fi
+
+	local targets=()
+	if [[ -n "$PATHS" ]]; then
+		while IFS= read -r dir; do
+			[[ -z "$dir" ]] || targets+=("$dir")
+		done < <(parse_env_paths "$PATHS")
+	else
+		while IFS= read -r dir; do
+			[[ -z "$dir" ]] || targets+=("$dir")
+		done < <(discover_env_example_dirs)
+	fi
+
+	if [[ ${#targets[@]} -eq 0 ]]; then
+		log "No .env.example locations discovered."
+		exit 0
+	fi
+
+	if [[ "$DO_LIST" = true ]]; then
+		log "Discovered env locations (status shows if .env exists):"
+		for dir in "${targets[@]}"; do
+			if [[ -f "$dir/.env.example" ]]; then
+				if [[ -f "$dir/.env" ]]; then
+					printf '[OK]       %s (has .env)\n' "$dir"
+					have_env=$((have_env+1))
+				else
+					printf '[MISSING]  %s (no .env)\n' "$dir"
+					missing_env=$((missing_env+1))
+					missing_env_list+=("$dir")
+				fi
+			else
+				printf '[SKIP]     %s (no .env.example)\n' "$dir"
+				skipped_no_example=$((skipped_no_example+1))
+				skipped_list+=("$dir")
+			fi
+		done
+		total=${#targets[@]}
+		printf '\nSummary: %d discovered | %d with .env | %d missing .env | %d without .env.example\n' "$total" "$have_env" "$missing_env" "$skipped_no_example"
+		if [[ $missing_env -gt 0 ]]; then
+			printf 'Missing .env in:\n'
+			for d in "${missing_env_list[@]}"; do printf '  - %s\n' "$d"; done
+		fi
+		if [[ $skipped_no_example -gt 0 ]]; then
+			printf 'No .env.example in:\n'
+			for d in "${skipped_list[@]}"; do printf '  - %s\n' "$d"; done
+		fi
+	fi
+
+	if [[ "$DO_RECREATE" = true ]]; then
+		log "Recreating .env from .env.example for ${#targets[@]} location(s)"
+		for dir in "${targets[@]}"; do
+			local ex="$dir/.env.example"
+			local env="$dir/.env"
+			if [[ ! -f "$ex" ]]; then
+				log "Skipping: no .env.example in $dir"
+				missing_example_count=$((missing_example_count+1))
+				missing_example_list+=("$dir")
+				continue
+			fi
+			if [[ -f "$env" && "$FORCE" = false ]]; then
+				log "Skipping (exists): $env (use --force to overwrite)"
+				skipped_exists_count=$((skipped_exists_count+1))
+				skipped_exists_list+=("$env")
+				continue
+			fi
+
+			if [[ -f "$env" && "$FORCE" = true ]]; then
+				if [[ "$ASSUME_YES" = false ]]; then
+					printf 'About to overwrite %s. Create backup and continue? [y/N]: ' "$env"
+					read -r ans
+					case "$ans" in
+						[Yy]|[Yy][Ee][Ss]) ;;
+						*) log "Aborting overwrite for $env"; continue ;;
+					esac
+				fi
+				if [[ "$DRY_RUN" = true ]]; then
+					log "DRY-RUN: backup and overwrite $env from $ex"
+					overwritten_count=$((overwritten_count+1))
+					overwritten_list+=("$env (dry-run)")
+				else
+					local backup
+					backup="$(backup_file "$env")"
+					log "Backed up $env -> $backup"
+					cp -f "$ex" "$env"
+					overwritten_count=$((overwritten_count+1))
+					overwritten_list+=("$env")
+					backup_list+=("$backup")
+				fi
+			else
+				if [[ "$DRY_RUN" = true ]]; then
+					log "DRY-RUN: create $env from $ex"
+					created_count=$((created_count+1))
+					created_list+=("$env (dry-run)")
+				else
+					cp -f "$ex" "$env"
+					created_count=$((created_count+1))
+					created_list+=("$env")
+				fi
+			fi
+		done
+		# Recreate summary
+		printf '\nSummary: %d targets | %d created | %d overwritten | %d skipped (exists) | %d missing .env.example\n' \
+			"${#targets[@]}" "$created_count" "$overwritten_count" "$skipped_exists_count" "$missing_example_count"
+		if [[ $created_count -gt 0 ]]; then
+			printf 'Created .env files:\n'; for f in "${created_list[@]}"; do printf '  - %s\n' "$f"; done
+		fi
+		if [[ $overwritten_count -gt 0 ]]; then
+			printf 'Overwritten .env files:\n'; for f in "${overwritten_list[@]}"; do printf '  - %s\n' "$f"; done
+			# Only show backups when not dry-run
+			if [[ ${#backup_list[@]} -gt 0 ]]; then
+				printf 'Backups created:\n'; for b in "${backup_list[@]}"; do printf '  - %s\n' "$b"; done
+			fi
+		fi
+		if [[ $skipped_exists_count -gt 0 ]]; then
+			printf 'Skipped (existing .env, use --force to overwrite):\n'; for f in "${skipped_exists_list[@]}"; do printf '  - %s\n' "$f"; done
+		fi
+		if [[ $missing_example_count -gt 0 ]]; then
+			printf 'Missing .env.example in:\n'; for d in "${missing_example_list[@]}"; do printf '  - %s\n' "$d"; done
+		fi
+	fi
 }
 
 cmd_up() {
@@ -171,13 +427,16 @@ cmd_up() {
 			err "Stack file not found for '$stack' in $STACKS_DIR or repo root (.yml/.yaml) -- skipping"
 			continue
 		fi
+		# Render into a temporary sibling file to resolve service-level env vars in labels/commands/etc.
+		local render_file
+		render_file="$(render_compose_file "$file")"
 		if [[ "$DRY_RUN" = true ]]; then
-			log "DRY-RUN: would run: docker stack deploy -c $file $stack"
-			log "DRY-RUN: validating compose file: $file"
-			compose_config "$file" || true
+			log "DRY-RUN: would run: docker stack deploy -c $render_file $stack"
+			log "DRY-RUN: validating compose file: $render_file"
+			compose_config "$render_file" || true
 		else
-			log "Deploying stack: $stack (file: $file)"
-			docker stack deploy -c "$file" "$stack"
+			log "Deploying stack: $stack (file: $render_file)"
+			docker stack deploy -c "$render_file" "$stack"
 		fi
 	done
 
@@ -354,10 +613,13 @@ cmd_doctor() {
 	for stack in "${STACK_FILES[@]}"; do
 		if file_path="$(find_stack_file "$stack")"; then
 			log "OK: found stack file for '$stack': $file_path"
-			if compose_config "$file_path" >/dev/null 2>&1; then
-				log "OK: '$stack' compose syntax valid"
+			# Attempt to render first for accurate validation
+			local rendered
+			rendered="$(render_compose_file "$file_path")"
+			if compose_config "$rendered" >/dev/null 2>&1; then
+				log "OK: '$stack' compose syntax valid (validated: $rendered)"
 			else
-				err "Validation failed for '$stack' ($file_path)"
+				err "Validation failed for '$stack' ($rendered)"
 				overall_ok=false
 			fi
 		else
@@ -403,7 +665,7 @@ cmd_doctor() {
 # Determine subcommand (default: up)
 SUBCOMMAND="${1:-}"
 case "$SUBCOMMAND" in
-	up|down|status|logs|doctor|help|-h|--help)
+	up|down|status|logs|doctor|env|help|-h|--help)
 		[[ $# -gt 0 ]] && shift || true ;;
 	*)
 		SUBCOMMAND="up" ;;
@@ -418,6 +680,8 @@ case "$SUBCOMMAND" in
 		cmd_status "$@" ;;
 	logs)
 		cmd_logs "$@" ;;
+	env)
+		cmd_env "$@" ;;
 	doctor)
 		cmd_doctor "$@" ;;
 	help|-h|--help)
