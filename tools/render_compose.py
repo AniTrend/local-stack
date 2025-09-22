@@ -9,10 +9,10 @@ that reference ${...} defined in those files. This tool bridges that gap by prod
 compose file where strings have been substituted ahead of deployment.
 
 Usage:
-  python3 tools/render_compose.py -i docker-compose.infrastructure.yml -o docker-compose.infrastructure.rendered.yml
+    python3 tools/render_compose.py -i stacks/infrastructure.yml -o ./.rendered/docker-compose.infrastructure.rendered.yml
 
 Notes:
-  - Output should be placed in the repo root (same directory as input) to preserve relative paths.
+    - Output can be placed under ./.rendered to keep the workspace clean (stackctl does this by default); relative paths are preserved.
   - Only string values are interpolated. Unresolved variables are left untouched by default with a warning.
   - Default expansion semantics:
       ${VAR} -> use VAR if defined, else leave as-is
@@ -26,7 +26,7 @@ import argparse
 import os
 import re
 import sys
-from typing import Any, Dict, List, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 try:
     import yaml  # type: ignore
@@ -93,7 +93,31 @@ def coerce_to_dict(env: Any) -> Dict[str, str]:
     return result
 
 
-def build_service_scope_vars(service: Dict[str, Any], base_env: Mapping[str, str], project_dir: str) -> Dict[str, str]:
+def resolve_env_path(rel_path: str, project_dir: str, repo_root: Optional[str]) -> str:
+    """Resolve a service env_file path, trying project_dir first then repo_root (if provided)."""
+    # Absolute path: return as-is
+    if os.path.isabs(rel_path):
+        return rel_path
+    # Try relative to the compose file directory
+    cand = os.path.normpath(os.path.join(project_dir, rel_path))
+    if os.path.isfile(cand):
+        return cand
+    # Try relative to the repository root (helps when stacks/ is used)
+    if repo_root:
+        # Normalize './' prefixes
+        rel_norm = rel_path[2:] if rel_path.startswith("./") else rel_path
+        cand2 = os.path.normpath(os.path.join(repo_root, rel_norm))
+        if os.path.isfile(cand2):
+            return cand2
+    return cand  # fall back to project_dir join (will likely not exist)
+
+
+def build_service_scope_vars(
+    service: Dict[str, Any],
+    base_env: Mapping[str, str],
+    project_dir: str,
+    repo_root: Optional[str],
+) -> Dict[str, str]:
     """Build the variable map for a service, layering env_file(s) then service.environment over base_env."""
     vars_map: Dict[str, str] = dict(base_env)
 
@@ -105,7 +129,7 @@ def build_service_scope_vars(service: Dict[str, Any], base_env: Mapping[str, str
         env_files = [e for e in env_file_val if isinstance(e, str)]
 
     for rel_path in env_files:
-        env_path = os.path.join(project_dir, rel_path)
+        env_path = resolve_env_path(rel_path, project_dir, repo_root)
         try:
             vars_map.update(parse_env_file(env_path))
         except FileNotFoundError:
@@ -169,7 +193,7 @@ def deep_interpolate(obj: Any, vars_map: Mapping[str, str]) -> Any:
     return obj
 
 
-def render_compose(data: Dict[str, Any], project_dir: str) -> Dict[str, Any]:
+def render_compose(data: Dict[str, Any], project_dir: str, repo_root: Optional[str]) -> Dict[str, Any]:
     """Produce a new compose dict with per-service interpolation applied."""
     base_env = {k: v for k, v in os.environ.items()}
 
@@ -182,7 +206,7 @@ def render_compose(data: Dict[str, Any], project_dir: str) -> Dict[str, Any]:
         if not isinstance(svc, dict):
             rendered_services[name] = svc
             continue
-        scope_vars = build_service_scope_vars(svc, base_env, project_dir)
+        scope_vars = build_service_scope_vars(svc, base_env, project_dir, repo_root)
         rendered_services[name] = deep_interpolate(svc, scope_vars)
 
     data = dict(data)
@@ -195,16 +219,28 @@ def main() -> int:
     parser.add_argument("-i", "--input", required=True, help="Path to input compose YAML")
     parser.add_argument("-o", "--output", required=True, help="Path to write rendered YAML")
     parser.add_argument("--strict", action="store_true", help="Exit non-zero on unresolved ${VAR} references")
+    parser.add_argument(
+        "--repo-root",
+        default=None,
+        help="Repository root for resolving service env_file paths (defaults to parent of input when input is under stacks/)",
+    )
     args = parser.parse_args()
 
     in_path = os.path.abspath(args.input)
     out_path = os.path.abspath(args.output)
     project_dir = os.path.dirname(in_path)
+    # Auto-detect repo root if not provided and input is under stacks/
+    repo_root = args.repo_root
+    if not repo_root:
+        if os.path.basename(project_dir) == "stacks":
+            repo_root = os.path.dirname(project_dir)
+        else:
+            repo_root = project_dir
 
     with open(in_path, "r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
 
-    rendered = render_compose(data, project_dir)
+    rendered = render_compose(data, project_dir, repo_root)
 
     # Optional strict check
     if args.strict:

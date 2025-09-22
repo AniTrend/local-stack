@@ -38,7 +38,8 @@ err() { log "ERROR: $*"; }
 
 # Determine repository root (directory containing this script)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
-STACKS_DIR="$SCRIPT_DIR"
+# Swarm stack definitions live under stacks/ (preferred); root-level docker-compose.* files are legacy fallbacks
+STACKS_DIR="$SCRIPT_DIR/stacks"
 
 check_command() {
 	command -v "$1" >/dev/null 2>&1 || { err "'$1' is required but not installed or not on PATH"; exit 2; }
@@ -67,10 +68,26 @@ render_compose_file() {
 	base="$(basename "$in_file")"
 	base_no_ext="${base%.yml}"
 	base_no_ext="${base_no_ext%.yaml}"
-	out_file="$out_dir/${base_no_ext}.rendered.yml"
+
+	# Keep rendered filenames prefixed with docker-compose.* for consistency
+	local out_base
+	case "$base" in
+		docker-compose.*.yml|docker-compose.*.yaml)
+			out_base="$base_no_ext" # already prefixed
+			;;
+		*.yml|*.yaml)
+			# If coming from stacks/<name>.yml, prefix with docker-compose.
+			local name_no_ext="$base_no_ext"
+			out_base="docker-compose.${name_no_ext}"
+			;;
+		*)
+			out_base="$base_no_ext"
+			;;
+	esac
+	out_file="$out_dir/${out_base}.rendered.yml"
 
 	if command -v python3 >/dev/null 2>&1; then
-		if python3 "$SCRIPT_DIR/tools/render_compose.py" -i "$in_file" -o "$out_file" >/dev/null 2>&1; then
+		if python3 "$SCRIPT_DIR/tools/render_compose.py" -i "$in_file" -o "$out_file" --repo-root "$SCRIPT_DIR" >/dev/null 2>&1; then
 			printf '%s\n' "$out_file"
 			return 0
 		else
@@ -86,8 +103,8 @@ render_compose_file() {
 find_stack_file() {
 	local name="$1"
 	local candidates=(
-		"$STACKS_DIR/docker-compose.${name}.yml"
-		"$STACKS_DIR/docker-compose.${name}.yaml"
+		"$SCRIPT_DIR/stacks/${name}.yml"
+		"$SCRIPT_DIR/stacks/${name}.yaml"
 		"$SCRIPT_DIR/docker-compose.${name}.yml"
 		"$SCRIPT_DIR/docker-compose.${name}.yaml"
 	)
@@ -424,7 +441,7 @@ cmd_up() {
 	for stack in "${TARGET_STACKS[@]}"; do
 		local file
 		if ! file="$(find_stack_file "$stack")"; then
-			err "Stack file not found for '$stack' in $STACKS_DIR or repo root (.yml/.yaml) -- skipping"
+			err "Stack file not found for '$stack' in stacks/ or repo root (.yml/.yaml) -- skipping"
 			continue
 		fi
 		# Render into a temporary sibling file to resolve service-level env vars in labels/commands/etc.

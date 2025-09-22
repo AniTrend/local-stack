@@ -15,16 +15,16 @@ pip3 install -r tools/requirements.txt
 ## Usage
 
 ```sh
-# Render a file next to the source
-python3 tools/render_compose.py -i docker-compose.infrastructure.yml -o docker-compose.infrastructure.rendered.yml
+# Render a stack file; output keeps docker-compose.* prefix under .rendered/
+python3 tools/render_compose.py -i stacks/infrastructure.yml -o .rendered/docker-compose.infrastructure.rendered.yml
 ```
 
 Then use the rendered file for validation or deployment:
 
 ```sh
-docker compose -f docker-compose.infrastructure.rendered.yml config
+docker compose -f .rendered/docker-compose.infrastructure.rendered.yml config
 # or
-docker stack deploy -c docker-compose.infrastructure.rendered.yml infrastructure
+docker stack deploy -c .rendered/docker-compose.infrastructure.rendered.yml infrastructure
 ```
 
 ## Behavior

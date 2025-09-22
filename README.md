@@ -2,7 +2,7 @@
 
 A local development environment for the AniTrend stack, providing a complete infrastructure setup for development and testing.
 
-> Swarm migration: This repository is migrating from multiple per-service Docker Compose files to modular Docker Swarm stacks located under `stacks/`.
+> Swarm migration: This repository has migrated from multiple per-service Docker Compose files to modular Docker Swarm stacks located under `stacks/`.
 > Prefer the Swarm workflow for full environment deploys; per-service Compose remains for local iterative work.
 >
 > Quick start (Swarm): see `stacks/README.md` for the runbook (init swarm, create `traefik-public`, deploy `infrastructure`, `observability`, `platform`).
@@ -182,7 +182,16 @@ git clone https://github.com/your-org/local-stack.git
 cd local-stack
 ```
 
-### 2. Set up core infrastructure (Compose - legacy local-only)
+### 2. Deploy via Swarm (recommended)
+
+See `stacks/README.md` for the full runbook or use `stackctl.sh` helpers:
+
+```bash
+./stackctl.sh doctor --fix-network
+./stackctl.sh up
+```
+
+### 3. Set up core infrastructure (Compose - legacy local-only)
 
 ```bash
 # Start Traefik first
@@ -196,7 +205,7 @@ cd ../mongo && docker-compose up -d
 cd ../redis && docker-compose up -d
 ```
 
-### 3. Set up the observability stack (Compose - legacy local-only)
+### 4. Set up the observability stack (Compose - legacy local-only)
 
 ```bash
 cd ../observability
@@ -206,7 +215,7 @@ done
 docker-compose up -d
 ```
 
-### 4. Set up additional services (Compose - legacy local-only)
+### 5. Set up additional services (Compose - legacy local-only)
 
 ```bash
 # API Gateway

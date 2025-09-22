@@ -77,6 +77,16 @@ Notes:
 - The `doctor` command validates Compose syntax for each stack and reminds you to create `.env` files where a `.env.example` exists.
 - If you use local HTTPS, make sure `traefik/certs/local-cert.pem` and `traefik/certs/local-key.pem` exist; see below for generation.
 
+### Rendered output naming
+
+When deploying, `stackctl.sh` pre-renders variables into a copy of the stack file and writes it to `.rendered/` with a docker-compose.* prefix:
+
+- `stacks/infrastructure.yml` -> `.rendered/docker-compose.infrastructure.rendered.yml`
+- `stacks/observability.yml` -> `.rendered/docker-compose.observability.rendered.yml`
+- `stacks/platform.yml` -> `.rendered/docker-compose.platform.rendered.yml`
+
+These files are ignored by Git and safe to regenerate at any time.
+
 ## Notes
 
 - Ensure each service folder has a `.env` copied from its `.env.example` where applicable.
