@@ -31,7 +31,7 @@ limits_config:
   allow_structured_metadata: false
   retention_period: 72h
   ingestion_rate_mb: 4
-  max_chunk_target_size: 1572864
+  ingestion_burst_size_mb: 4
 
 analytics:
   reporting_enabled: false
@@ -39,3 +39,7 @@ analytics:
 compactor:
   working_directory: /loki/compactor
   retention_enabled: true
+  # Required when retention is enabled. Using local filesystem store since
+  # common.storage.filesystem is configured above.
+  delete_request_store: filesystem
+  delete_request_store_db_type: boltdb
