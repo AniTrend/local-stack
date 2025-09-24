@@ -58,17 +58,8 @@ certificatesResolvers:
       caServer: "https://acme-v02.api.letsencrypt.org/directory"
       httpChallenge:
         entryPoint: web
-  # Local development: use with file-based certificates (see dynamic.yml tls.certificates)
-  # Note: ACME cannot issue for .localhost; this resolver exists to allow selecting
-  # CERT_RESOLVER=local in labels without attempting real issuance. Keep httpChallenge
-  # to satisfy Traefik schema; certificates are served from file provider.
   local:
-    acme:
-      email: dev@docker.localhost
-      storage: /etc/traefik/certs/acme-local.json
-      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
-      httpChallenge:
-        entryPoint: web
+    tailscale: {}
 
 # (Optional) Overwrite Default Certificates
 # tls:
