@@ -15,9 +15,11 @@ services:
       - "traefik.http.routers.anitrend-graphql.tls=true"
       - "traefik.http.routers.anitrend-graphql.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.anitrend-graphql.loadbalancer.server.port=${PORT}"
+    restart: unless-stopped
     logging:
+      driver: local
       options:
-        max-size: "10m"
+        max-size: "2m"
         max-file: "3"
 
 networks:

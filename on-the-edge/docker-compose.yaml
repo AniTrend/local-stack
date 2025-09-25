@@ -15,6 +15,10 @@ services:
       - "traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}"
     restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:
