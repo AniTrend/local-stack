@@ -1,0 +1,12 @@
+# Example SOPS configuration
+# Copy to .sops.yaml and adjust keys/providers for your environment.
+# Docs: https://github.com/getsops/sops
+
+creation_rules:
+  # Example: age key (recommended for simplicity)
+  - path_regex: 
+      - ".*\\.enc\\.yaml$"
+      - ".*secret.*\\.yaml$"
+    age: ["age1exampleexampleexampleexampleexampleexampleexampleexamplex"]
+    encrypted_regex: ".*"
+    # or use kms/gcp_kms/pgp depending on your setup
