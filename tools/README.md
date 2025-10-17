@@ -136,3 +136,11 @@ Notes and tips
 - Use overlays to drive Traefik hostnames, TLS settings, resource constraints, and scaling hints.
 - For secrets, prefer encrypted files (SOPS) and use `tools/stackctl_cli.py secrets decrypt` during local setup.
 
+Secrets with SOPS
+-----------------
+
+We recommend storing secrets as SOPS-encrypted YAML files (e.g., `.env.enc.yaml`) and keep the
+repository free of plaintext `.env` files. See `docs/SOPS-usage.md` for a short guide on how to
+create and decrypt SOPS files locally using the `stackctl_cli` helpers.
+
+
