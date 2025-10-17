@@ -14,14 +14,14 @@ Examples
 
 ```bash
 # requires sops installed and the proper keys available in your keystore
-python3 tools/stackctl_cli.py secrets decrypt --in apisix/api-gateway/.env.example.enc.yaml --out apisix/api-gateway/.env --force
+./stackctl.sh secrets decrypt --in apisix/api-gateway/.env.example.enc.yaml --out apisix/api-gateway/.env --force
 ```
 
 2) Encrypt a plaintext .env into an encrypted file
 
 ```bash
 # Use sops to encrypt; this will respect .sops.yaml
-python3 tools/stackctl_cli.py secrets encrypt --in apisix/api-gateway/.env --out apisix/api-gateway/.env.enc.yaml
+./stackctl.sh secrets encrypt --in apisix/api-gateway/.env --out apisix/api-gateway/.env.enc.yaml
 ```
 
 3) Best practices
