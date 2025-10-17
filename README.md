@@ -191,6 +191,22 @@ See `stacks/README.md` for the full runbook or use `stackctl.sh` helpers:
 ./stackctl.sh up
 ```
 
+### Bootstrap (developer setup)
+
+To quickly prepare a development machine for working with this repository, there's a helper built into the main wrapper script.
+
+```bash
+./stackctl.sh --bootstrap
+```
+
+What this does:
+- Copies missing `.env` files from `.env.example` where present.
+- Installs Python requirements from `tools/requirements.txt` when a Python virtualenv is active.
+- Checks that Docker is installed and whether Docker Swarm is active (prints next steps if not).
+
+This is a safe convenience for local setup; it does not commit or overwrite existing `.env` files. See `tools/README.md` for more details about renderers and SOPS usage.
+
+
 ### 3. Set up core infrastructure (Compose - legacy local-only)
 
 ```bash
