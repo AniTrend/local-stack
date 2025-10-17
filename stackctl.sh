@@ -9,10 +9,60 @@ IFS=$'\n\t'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
 PY_CLI="$SCRIPT_DIR/tools/stackctl_cli.py"
 
-if [[ ! -f "$PY_CLI" ]]; then
-  printf 'ERROR: Python CLI not found at %s\n' "$PY_CLI" >&2
-  exit 2
-fi
+info() { printf "[info] %s\n" "$*"; }
+warn() { printf "[warn] %s\n" "$*"; }
+die() { printf "[error] %s\n" "$*" >&2; exit 1; }
+
+run_py() {
+  # run the Python CLI with forwarded args
+  python3 "$PY_CLI" "$@"
+}
+
+check_py_cli() {
+  if [[ ! -f "$PY_CLI" ]]; then
+    die "Python CLI not found at $PY_CLI"
+  fi
+}
+
+bootstrap() {
+  info "Copying .env.example files..."
+  # Create missing .env files from examples
+  find . -type f -name '.env.example' -print0 | while IFS= read -r -d '' src; do
+    dst="${src%.env.example}.env"
+    if [ ! -e "$dst" ]; then
+      info "create $dst"
+      cp "$src" "$dst"
+    fi
+  done
+
+  if [ -f tools/requirements.txt ]; then
+    if [ -n "${VIRTUAL_ENV:-}" ]; then
+      info "Installing Python requirements..."
+      pip install -r tools/requirements.txt
+    else
+      warn "No Python venv active. Activate your venv before running bootstrap for Python deps."
+    fi
+  fi
+
+  if command -v docker >/dev/null 2>&1; then
+    info "Docker version: $(docker --version)"
+    if docker info | grep -q 'Swarm: active'; then
+      info "Docker Swarm is active."
+    else
+      warn "Docker Swarm is not active. Run: docker swarm init"
+    fi
+  else
+    die "Docker not found. Please install Docker Desktop or Docker Engine."
+  fi
+
+  printf "\n[bootstrap] Next steps:\n"
+  printf "  - Review .env files and adjust as needed.\n"
+  printf "  - Run ./stackctl.sh doctor --fix-network\n"
+  printf "  - Run ./stackctl.sh up\n"
+  printf "  - See tools/README.md for CLI usage.\n"
+}
+
+check_py_cli
 
 cmd="${1:-}"
 shift || true
@@ -35,31 +85,37 @@ case "${cmd:-}" in
         *) args+=("$1"); shift ;;
       esac
     done
-    exec python3 "$PY_CLI" deploy "${args[@]:-}" ;;
+    exec run_py deploy "${args[@]:-}" ;;
 
   down)
-    exec python3 "$PY_CLI" down "$@" ;;
+    exec run_py down "$@" ;;
 
   status)
-    exec python3 "$PY_CLI" status "$@" ;;
+    exec run_py status "$@" ;;
 
   logs)
-    exec python3 "$PY_CLI" logs "$@" ;;
+    exec run_py logs "$@" ;;
 
   env)
-    exec python3 "$PY_CLI" env "$@" ;;
+    exec run_py env "$@" ;;
 
   doctor)
-    exec python3 "$PY_CLI" doctor run "$@" ;;
+    exec run_py doctor run "$@" ;;
+
+  --bootstrap|bootstrap)
+    bootstrap
+    exit 0 ;;
 
   help|-h|--help)
-    exec python3 "$PY_CLI" --help ;;
+    exec run_py --help ;;
 
   "" )
     # No command supplied: show help (do not default to deploy)
-    exec python3 "$PY_CLI" --help ;;
+    exec run_py --help ;;
+
   *)
     printf 'ERROR: unknown command "%s"\n\n' "${cmd:-}" >&2
-    exec python3 "$PY_CLI" --help ;;
+    exec run_py --help ;;
 esac
+
 
