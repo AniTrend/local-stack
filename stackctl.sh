@@ -18,7 +18,7 @@ cmd="${1:-}"
 shift || true
 
 case "${cmd:-}" in
-  up|deploy|"" )
+  up|deploy )
     # Map legacy flags: --no-logs -> --no-follow-logs
     args=()
     while [[ $# -gt 0 ]]; do
@@ -55,11 +55,11 @@ case "${cmd:-}" in
   help|-h|--help)
     exec python3 "$PY_CLI" --help ;;
 
+  "" )
+    # No command supplied: show help (do not default to deploy)
+    exec python3 "$PY_CLI" --help ;;
   *)
-    # default to deploy
-    set +e
-    printf 'Unknown or missing command "%s" — delegating to deploy.\n' "${cmd:-}" >&2
-    set -e
-    exec python3 "$PY_CLI" deploy "$@" ;;
+    printf 'ERROR: unknown command "%s"\n\n' "${cmd:-}" >&2
+    exec python3 "$PY_CLI" --help ;;
 esac
 
