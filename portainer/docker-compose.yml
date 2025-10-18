@@ -1,6 +1,8 @@
 ---
 volumes:
   portainer-data:
+    name:
+      portainer-data
     driver: local
 services:
   app:
