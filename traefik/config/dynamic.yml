@@ -1,6 +1,6 @@
 # Dynamic TLS certificates for local development
 # Note: Routers/middlewares/services are defined via Docker labels to avoid duplication.
-tls:
-  certificates:
-    - certFile: "/etc/traefik/certs/local-cert.pem"
-      keyFile: "/etc/traefik/certs/local-key.pem"
+# tls:
+#   certificates:
+#     - certFile: "/etc/traefik/certs/local-cert.pem"
+#       keyFile: "/etc/traefik/certs/local-key.pem"
