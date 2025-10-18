@@ -46,19 +46,19 @@ entryPoints:
 certificatesResolvers:
   staging:
     acme:
-      email: anitrendapp@gmail.com
+      email: support@anitrend.co
       storage: /etc/traefik/certs/acme.json
       caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
       httpChallenge:
         entryPoint: web
   production:
     acme:
-      email: anitrendapp@gmail.com
+      email: support@anitrend.co
       storage: /etc/traefik/certs/acme.json
       caServer: "https://acme-v02.api.letsencrypt.org/directory"
       httpChallenge:
         entryPoint: web
-  local:
+  tailscale:
     tailscale: {}
 
 # (Optional) Overwrite Default Certificates
