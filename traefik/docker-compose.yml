@@ -23,6 +23,7 @@ services:
       - ./config/traefik.yml:/etc/traefik/traefik.yml:ro
       - ./config/dynamic.yml:/etc/traefik/dynamic.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/tailscale:/var/run/tailscale:ro
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.traefik-ui.rule=Host(`${HOST}`)"
