@@ -10,7 +10,7 @@ volumes:
 
 services:
   beszel:
-    image: henrygd/beszel:0.13.2
+    image: henrygd/beszel:0.14.0
     container_name: beszel
     restart: unless-stopped
     networks:
