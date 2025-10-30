@@ -14,13 +14,12 @@ services:
     env_file: .env
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
-      - "traefik.http.routers.otel.rule=Host(`${HOST}`)"
-      - "traefik.http.routers.otel.entrypoints=web,websecure"
-      - "traefik.http.routers.otel.service=otel"
-      - "traefik.http.routers.otel.middlewares=sso@docker"
-      - "traefik.http.routers.otel.tls=true"
-      - "traefik.http.routers.otel.tls.certresolver=${CERT_RESOLVER}"
-      - "traefik.http.services.otel.loadbalancer.server.port=${PORT}"
+      - "traefik.tcp.routers.otel.rule=HostSNI(`${HOST}`)"
+      - "traefik.tcp.routers.otel.entrypoints=web,websecure"
+      - "traefik.tcp.routers.otel.service=otel"
+      - "traefik.tcp.routers.otel.tls=true"
+      - "traefik.tcp.routers.otel.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.tcp.services.otel.loadbalancer.server.port=${PORT}"
     networks:
       - default
     restart: unless-stopped
