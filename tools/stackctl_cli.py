@@ -30,6 +30,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -255,7 +256,7 @@ def deploy(
 
 
 @APP.command()
-def logs(services: List[str] = typer.Argument(None, help="Services to follow (default preset)") ):
+def logs(services: List[str] = typer.Argument(None, help="Services to follow (default preset)")):
     """Follow logs for services (docker service logs -f)."""
     svcs = services or DEFAULT_LOG_SERVICES
     for svc in svcs:
@@ -363,7 +364,7 @@ def env_recreate(
                 if resp.lower() not in ("y", "yes"):
                     skipped.append(str(envp))
                     continue
-            backup = envp.with_suffix(envp.suffix + f".bak.{int(os.times().elapsed)}")
+            backup = envp.with_suffix(envp.suffix + f".bak.{int(time.time())}")
             shutil.copy2(envp, backup)
             shutil.copy2(ex, envp)
             overwritten.append(str(envp))
@@ -400,7 +401,7 @@ def secrets_decrypt(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     # Write directly to file to avoid secrets in stdout
     with output_path.open("wb") as fh:
-        proc = subprocess.run(["sops", "-d", str(input_path)], check=True, stdout=fh)
+        subprocess.run(["sops", "-d", str(input_path)], check=True, stdout=fh)
     console.print(f"[green]Decrypted[/green] -> {output_path}")
 
 
