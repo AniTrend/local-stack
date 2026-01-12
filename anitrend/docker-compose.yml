@@ -1,7 +1,7 @@
 ---
 services:
   django-server:
-    image: ghcr.io/anitrend/anitrend:0.7.1
+    image: ghcr.io/anitrend/anitrend:0.7.2
     command: ["/usr/src/start.sh"]
     container_name: django-server
     networks:
