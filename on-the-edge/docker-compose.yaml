@@ -1,7 +1,7 @@
 ---
 services:
   anitrend-edge:
-    image: ghcr.io/anitrend/on-the-edge:1.1.0
+    image: ghcr.io/anitrend/on-the-edge:1.1.1
     container_name: anitrend-edge
     networks:
       - default
