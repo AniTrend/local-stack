@@ -1,7 +1,7 @@
 services:
   website:
     container_name: website
-    image: ghcr.io/anitrend/website:0.2.0
+    image: ghcr.io/anitrend/website:0.3.0
     networks:
       - default
     env_file: .env
