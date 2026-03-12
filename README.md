@@ -248,6 +248,7 @@ docker-compose up -d
 local-stack/
 ├── apisix/           # API Gateway configuration
 ├── anitrend/         # AniTrend application specific configs
+├── edge-graphql/     # GraphQL gateway for edge services
 ├── growthbook/       # Feature flag management
 ├── mongo/           # MongoDB configuration
 ├── observability/   # Monitoring stack (detailed above)

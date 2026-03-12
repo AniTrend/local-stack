@@ -1,0 +1,28 @@
+---
+services:
+  edge-graphql:
+    image: ghcr.io/anitrend/edge-graphql:0.1.1
+    container_name: edge-graphql
+    networks:
+      - default
+    env_file: .env
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.edge-graphql.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.edge-graphql.entrypoints=web,websecure"
+      - "traefik.http.routers.edge-graphql.service=edge-graphql"
+      - "traefik.http.routers.edge-graphql.tls=true"
+      - "traefik.http.routers.edge-graphql.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.edge-graphql.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.edge-graphql.loadbalancer.healthcheck.path=/health"
+    restart: unless-stopped
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  default:
+    name: traefik
+    external: true
