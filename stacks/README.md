@@ -6,7 +6,7 @@ This folder contains the modular Docker Swarm stacks for the Local-Stack project
 
 - `infrastructure.yml`: Traefik, Portainer, APISIX (gateway + etcd + dashboard), Postgres, Mongo, Redis
 - `observability.yml`: Prometheus, Grafana, Loki, Tempo, OTel Collector
-- `platform.yml`: GrowthBook (dashboard + proxy), AniTrend apps/services
+- `platform.yml`: GrowthBook (dashboard + proxy), AniTrend apps/services (`anitrend`, `on-the-edge`, `edge-graphql`)
 
 ## Conventions
 

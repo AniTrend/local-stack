@@ -194,6 +194,51 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  edge_graphql:
+    image: ghcr.io/anitrend/edge-graphql:0.1.1
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 96M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
+    networks:
+      default:
+        aliases:
+          - edge-graphql
+    depends_on:
+      - anitrend_edge
+    env_file: ./edge-graphql/.env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS -o /dev/null http://127.0.0.1:$PORT/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.edge-graphql.rule=Host(`${ROUTER_HOST}`)"
+      - "traefik.http.routers.edge-graphql.entrypoints=web,websecure"
+      - "traefik.http.routers.edge-graphql.service=edge-graphql"
+      - "traefik.http.routers.edge-graphql.tls=true"
+      - "traefik.http.routers.edge-graphql.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.edge-graphql.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.edge-graphql.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.edge-graphql.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.edge-graphql.loadbalancer.healthcheck.timeout=2s"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 networks:
   default:
     name: traefik-public
