@@ -9,3 +9,5 @@ htpasswd
 *.rendered.yml
 .venv/
 __pycache__/
+# Added by code-review-graph
+.code-review-graph/
