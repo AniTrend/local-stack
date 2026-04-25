@@ -1,0 +1,8 @@
+services:
+  mongo:
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+        limits:
+          memory: 800M

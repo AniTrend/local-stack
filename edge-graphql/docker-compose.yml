@@ -1,4 +1,5 @@
 ---
+x-stack: platform
 services:
   edge-graphql:
     image: ghcr.io/anitrend/edge-graphql:0.1.4
@@ -20,7 +21,7 @@ services:
       driver: local
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: 3
 
 networks:
   default:

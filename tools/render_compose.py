@@ -25,16 +25,28 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import io
 import sys
 from typing import Any, Dict, List, Mapping, Optional
 
 try:
-    import yaml  # type: ignore
-except Exception as e:  # pragma: no cover
+    from ruamel.yaml import YAML as _YAML  # type: ignore
+    _yaml = _YAML()
+    _yaml.preserve_quotes = True
+    # Keep list items visually nested under their keys.
+    _yaml.indent(mapping=2, sequence=4, offset=2)
+    _yaml.width = 2 ** 20  # prevent unwanted line wrapping
+except ImportError:  # pragma: no cover
     sys.stderr.write(
-        "ERROR: PyYAML is required. Install with: pip3 install -r tools/requirements.txt\n"
+        "ERROR: ruamel.yaml is required. Install with: pip3 install -r tools/requirements.txt\n"
     )
     sys.exit(2)
+
+# PyYAML kept only for VAR_PATTERN / PLAIN_PATTERN regex usage below
+try:
+    import yaml  # type: ignore  # noqa: F401 — used only as a lightweight string check
+except ImportError:  # pragma: no cover
+    yaml = None  # type: ignore
 
 
 VAR_PATTERN = re.compile(r"\$\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:(?P<sep>:-|-)\s*(?P<default>[^}]*))?\}")
@@ -299,13 +311,15 @@ def main() -> int:
             repo_root = project_dir
 
     with open(in_path, "r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh) or {}
+        data = _yaml.load(fh) or {}
 
     rendered = render_compose(data, project_dir, repo_root)
 
     # Optional strict check
     if args.strict:
-        text_dump = yaml.safe_dump(rendered, sort_keys=False)
+        buf = io.StringIO()
+        _yaml.dump(rendered, buf)
+        text_dump = buf.getvalue()
         unresolved = VAR_PATTERN.findall(text_dump)
         if unresolved:
             names = ", ".join(sorted(set(n for (n, _sep, _def) in unresolved if n)))
@@ -315,7 +329,7 @@ def main() -> int:
     # Ensure output directory exists
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as fh:
-        yaml.safe_dump(rendered, fh, sort_keys=False)
+        _yaml.dump(rendered, fh)
 
     print(out_path)
     return 0

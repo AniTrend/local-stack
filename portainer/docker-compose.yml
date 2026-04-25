@@ -1,11 +1,11 @@
 ---
+x-stack: infrastructure
 volumes:
   portainer-data:
-    name:
-      portainer-data
+    name: portainer-data
     driver: local
 services:
-  app:
+  portainer:
     container_name: portainer
     image: 'portainer/portainer-ee:2.40.0'
     volumes:
@@ -26,7 +26,7 @@ services:
     logging:
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: 3
 
 networks:
   default:

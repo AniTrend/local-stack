@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 jobs:
   lint:
@@ -43,3 +43,36 @@ jobs:
           severity: 'HIGH,CRITICAL'
           exit-code: '1'
           ignore-unfixed: true
+
+  stack-sync-check:
+    needs: [lint]
+    name: Stack drift check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install PyYAML
+        run: pip install PyYAML
+      - name: Check stacks are in sync with compose sources
+        run: python3 tools/generate_stacks.py --output-dir /tmp/stacks-check
+      - name: Diff generated vs committed stacks
+        run: |
+          drift=0
+          for stack in infrastructure observability platform; do
+            if ! diff -q "/tmp/stacks-check/${stack}.yml" "stacks/${stack}.yml" >/dev/null 2>&1; then
+              echo "DRIFT: stacks/${stack}.yml is out of sync"
+              diff "stacks/${stack}.yml" "/tmp/stacks-check/${stack}.yml" || true
+              drift=1
+            else
+              echo "OK: stacks/${stack}.yml"
+            fi
+          done
+          if [ "$drift" -eq 1 ]; then
+            echo ""
+            echo "Run './stackctl.sh generate' and commit the result."
+            exit 1
+          fi

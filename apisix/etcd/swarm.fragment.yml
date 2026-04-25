@@ -1,0 +1,8 @@
+services:
+  etcd:
+    deploy:
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M

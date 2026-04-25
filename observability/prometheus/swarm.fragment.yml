@@ -1,0 +1,17 @@
+services:
+  prometheus:
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+      resources:
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+        limits:
+          memory: 1200M
+          cpus: '0.80'

@@ -1,4 +1,5 @@
 ---
+x-stack: platform
 services:
   django-server:
     image: ghcr.io/anitrend/anitrend:0.8.0
@@ -20,7 +21,7 @@ services:
       driver: local
       options:
         max-size: "2m"
-        max-file: "3"
+        max-file: 3
 
 networks:
   default:

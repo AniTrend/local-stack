@@ -1,3 +1,4 @@
+x-stack: platform
 services:
   website:
     container_name: website
