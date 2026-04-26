@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import sys
 import textwrap
+from typing import Any, Dict
 
 import pytest
 
@@ -35,7 +37,7 @@ def test_deep_merge_scalars():
 # ---------------------------------------------------------------------------
 def test_deep_merge_nested_dict():
     base = {"deploy": {"resources": {"limits": {"memory": "128M"}}}}
-    override = {
+    override: Dict[str, Any] = {
         "deploy": {
             "mode": "global",
             "resources": {"limits": {"memory": "512M"}},
@@ -90,7 +92,7 @@ def test_collect_named_volumes_basic():
 # ---------------------------------------------------------------------------
 # 6. load_compose — extracts x-stack and removes it from returned data
 # ---------------------------------------------------------------------------
-def test_load_compose_extracts_x_stack(tmp_path):
+def test_load_compose_extracts_x_stack(tmp_path: Path):
     compose_file = tmp_path / "docker-compose.yml"
     compose_file.write_text(
         textwrap.dedent(
@@ -111,7 +113,7 @@ def test_load_compose_extracts_x_stack(tmp_path):
 # ---------------------------------------------------------------------------
 # 7. load_compose — raises ValueError when x-stack is missing
 # ---------------------------------------------------------------------------
-def test_load_compose_missing_x_stack(tmp_path):
+def test_load_compose_missing_x_stack(tmp_path: Path):
     compose_file = tmp_path / "docker-compose.yml"
     compose_file.write_text(
         textwrap.dedent(
@@ -129,7 +131,7 @@ def test_load_compose_missing_x_stack(tmp_path):
 # ---------------------------------------------------------------------------
 # 8. load_fragment — returns {} when swarm.fragment.yml is absent
 # ---------------------------------------------------------------------------
-def test_load_fragment_absent(tmp_path):
+def test_load_fragment_absent(tmp_path: Path):
     result = load_fragment(str(tmp_path))
     assert result == {}
 
@@ -137,7 +139,7 @@ def test_load_fragment_absent(tmp_path):
 # ---------------------------------------------------------------------------
 # 9. load_fragment — returns parsed dict when swarm.fragment.yml is present
 # ---------------------------------------------------------------------------
-def test_load_fragment_present(tmp_path):
+def test_load_fragment_present(tmp_path: Path):
     frag_file = tmp_path / "swarm.fragment.yml"
     frag_file.write_text(
         textwrap.dedent(
@@ -156,7 +158,7 @@ def test_load_fragment_present(tmp_path):
 # ---------------------------------------------------------------------------
 # 10. ${VAR} placeholders in labels are NOT resolved — preserved for render step
 # ---------------------------------------------------------------------------
-def test_env_vars_kept_as_placeholders(tmp_path):
+def test_env_vars_kept_as_placeholders(tmp_path: Path):
     env_file = tmp_path / ".env"
     env_file.write_text("HOST=myhost.local\n")
 
@@ -205,8 +207,8 @@ def test_logging_defaults_injected():
 # 12. apply_logging_defaults — does NOT overwrite an existing logging block
 # ---------------------------------------------------------------------------
 def test_logging_defaults_not_overwritten():
-    existing = {"driver": "json-file", "options": {"max-size": "5m"}}
-    svc = {"image": "nginx", "logging": existing}
+    existing: Dict[str, Any] = {"driver": "json-file", "options": {"max-size": "5m"}}
+    svc: Dict[str, Any] = {"image": "nginx", "logging": existing}
     result = apply_logging_defaults(svc)
     assert result["logging"] == existing
 
@@ -214,7 +216,7 @@ def test_logging_defaults_not_overwritten():
 # ---------------------------------------------------------------------------
 # 13. generate_stack injects logging into services without a logging block
 # ---------------------------------------------------------------------------
-def test_generate_stack_injects_logging(tmp_path):
+def test_generate_stack_injects_logging(tmp_path: Path):
     compose_file = tmp_path / "docker-compose.yml"
     compose_file.write_text(
         textwrap.dedent(
