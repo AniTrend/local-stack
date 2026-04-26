@@ -1,6 +1,9 @@
 # Local-Stack Swarm Stacks
 
-This folder contains the modular Docker Swarm stacks for the Local-Stack project.
+> **These files are generated artifacts.** Do not edit them directly.
+> The source of truth is each service's `docker-compose.yml` (plus its `swarm.fragment.yml` for Swarm-specific config).
+> To regenerate: `./stackctl.sh generate`
+> To check for drift: `./stackctl.sh sync`
 
 ## Stacks
 

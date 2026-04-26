@@ -1,0 +1,25 @@
+services:
+  beszel:
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
+  beszel-agent:
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 32M
+        limits:
+          memory: 96M

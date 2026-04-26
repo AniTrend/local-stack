@@ -1,6 +1,7 @@
 ---
+x-stack: platform
 services:
-  proxy:
+  growthbook_proxy:
     container_name: "growthbook-proxy"
     image: growthbook/proxy:git-efec2de
     env_file: .env
@@ -18,7 +19,7 @@ services:
     logging:
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: 3
     # healthcheck:
     #   test: ['CMD', 'curl', '-f', 'http://localhost:${PORT}/healthcheck']
     #   interval: 20s

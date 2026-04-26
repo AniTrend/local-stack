@@ -39,6 +39,7 @@ Goal: help an automated coding agent become productive quickly by describing the
 - Validation (CI/dev):
   - Compose syntax: `docker compose -f <path> config`.
   - YAML linting: `yamllint <file>`.
+  - YAML parsing validation: `yq e '.' <file> >/dev/null` (prefer this in scripts/workflows for fast syntax checks).
   - Dockerfile linting: `hadolint` via container.
 
 4) What to change and where (safe-scoped edits)

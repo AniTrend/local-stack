@@ -1,4 +1,5 @@
 ---
+x-stack: infrastructure
 volumes:
   mongo-data:
     name: mongo_mongo-data

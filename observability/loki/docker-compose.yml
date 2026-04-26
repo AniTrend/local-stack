@@ -1,4 +1,5 @@
 ---
+x-stack: observability
 volumes:
   loki-data:
     name: loki-data
@@ -19,7 +20,7 @@ services:
     logging:
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: 3
 
 networks:
   default:

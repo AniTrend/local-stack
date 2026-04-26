@@ -19,6 +19,8 @@ Commands:
 	logs		Follow logs for key services or specified services
 	doctor		Run preflight checks and optional fixes
 	env		List or recreate .env files from .env.example (safe-guarded)
+	generate	(Re-)generate stacks/ from compose file sources
+	sync		Check if stacks/ matches compose sources; exits 1 on drift
 	help		Show this help message and exit
 
 Examples:
@@ -26,6 +28,8 @@ Examples:
 	$SCRIPT_NAME down -y --remove-network -s platform
 	$SCRIPT_NAME status -s infrastructure
 	$SCRIPT_NAME logs infrastructure_traefik observability_prometheus
+	$SCRIPT_NAME generate
+	$SCRIPT_NAME sync
 
 Common options:
 	-h, --help	Show help (also works per-command)
@@ -45,58 +49,48 @@ check_command() {
 	command -v "$1" >/dev/null 2>&1 || { err "'$1' is required but not installed or not on PATH"; exit 2; }
 }
 
+# Render a pre-merged stack file (stacks/*.yml) through tools/render_compose.py.
+# This performs per-service ${VAR} substitution using each service's env_file(s)
+# and writes the result to .rendered/ (which is git-ignored).
+# The rendered file — never the source stack file — is what docker stack deploy reads.
+render_stack_file() {
+	local in_file="$1"
+	local stack_name
+	stack_name="$(basename "${in_file%.yml}")"
+	stack_name="${stack_name%.yaml}"
+	local out_dir="${RENDER_DIR:-$SCRIPT_DIR/.rendered}"
+	mkdir -p "$out_dir"
+	local out_file="$out_dir/${stack_name}.rendered.yml"
+
+	if command -v python3 >/dev/null 2>&1; then
+		if python3 "$SCRIPT_DIR/tools/render_compose.py" \
+				-i "$in_file" \
+				-o "$out_file" \
+				--repo-root "$SCRIPT_DIR" >/dev/null 2>&1; then
+			printf '%s\n' "$out_file"
+			return 0
+		else
+			log "Warning: render failed for $in_file; deploying unrendered (labels with \${VAR} may not resolve)"
+		fi
+	else
+		log "Warning: python3 not found; skipping render for $in_file (labels with \${VAR} may not resolve)"
+	fi
+	printf '%s\n' "$in_file"
+}
+
 # Prefer docker compose plugin, fall back to docker-compose if available
+# Always pass --project-directory so relative paths (env_file, bind mounts) in
+# stacks/*.yml resolve against the repo root, not the stack file's directory.
 compose_config() {
 	local file="$1"
 	if docker compose version >/dev/null 2>&1; then
-		docker compose -f "$file" config
+		docker compose --project-directory "$SCRIPT_DIR" -f "$file" config
 	elif command -v docker-compose >/dev/null 2>&1; then
-		docker-compose -f "$file" config
+		docker-compose --project-directory "$SCRIPT_DIR" -f "$file" config
 	else
 		err "Neither 'docker compose' nor 'docker-compose' is available to validate $file"
 		return 1
 	fi
-}
-
-# Render a compose file with per-service env interpolation using tools/render_compose.py
-render_compose_file() {
-	local in_file="$1"
-	local out_dir out_file base base_no_ext
-	# Allow override via RENDER_DIR, default to repo-local hidden folder
-	out_dir="${RENDER_DIR:-$SCRIPT_DIR/.rendered}"
-	mkdir -p "$out_dir"
-	base="$(basename "$in_file")"
-	base_no_ext="${base%.yml}"
-	base_no_ext="${base_no_ext%.yaml}"
-
-	# Keep rendered filenames prefixed with docker-compose.* for consistency
-	local out_base
-	case "$base" in
-		docker-compose.*.yml|docker-compose.*.yaml)
-			out_base="$base_no_ext" # already prefixed
-			;;
-		*.yml|*.yaml)
-			# If coming from stacks/<name>.yml, prefix with docker-compose.
-			local name_no_ext="$base_no_ext"
-			out_base="docker-compose.${name_no_ext}"
-			;;
-		*)
-			out_base="$base_no_ext"
-			;;
-	esac
-	out_file="$out_dir/${out_base}.rendered.yml"
-
-	if command -v python3 >/dev/null 2>&1; then
-		if python3 "$SCRIPT_DIR/tools/render_compose.py" -i "$in_file" -o "$out_file" --repo-root "$SCRIPT_DIR" >/dev/null 2>&1; then
-			printf '%s\n' "$out_file"
-			return 0
-		else
-			log "Warning: compose render failed for $in_file; using original file"
-		fi
-	else
-		log "Warning: python3 not found; skipping compose render for $in_file"
-	fi
-	printf '%s\n' "$in_file"
 }
 
 # Find a stack file by name with common fallbacks (.yml/.yaml in repo root)
@@ -409,9 +403,111 @@ cmd_env() {
 	fi
 }
 
+cmd_generate() {
+	local DRY_RUN=false
+	local STACKS_ARG=""
+
+	while [[ $# -gt 0 ]]; do
+		case "${1:-}" in
+			--dry-run)
+				DRY_RUN=true; shift ;;
+			-s|--stacks)
+				[[ $# -lt 2 ]] && { err "--stacks requires a value"; exit 2; }
+				STACKS_ARG="${2:-}"; shift 2 ;;
+			-h|--help)
+				log "Generate stacks/ from compose sources. Options: --dry-run, -s/--stacks <list>"; exit 0 ;;
+			--)
+				shift; break ;;
+			-*)
+				printf '%s: unknown option for generate: %s\n' "$SCRIPT_NAME" "$1" >&2; exit 2 ;;
+			*)
+				break ;;
+		esac
+	done
+
+	if ! command -v python3 >/dev/null 2>&1; then
+		err "python3 is required for 'generate'"
+		exit 2
+	fi
+
+	local gen_args=()
+	[[ "$DRY_RUN" = true ]] && gen_args+=(--dry-run)
+	[[ -n "$STACKS_ARG" ]] && gen_args+=(-s "$STACKS_ARG")
+
+	log "Generating stack files from compose sources..."
+	python3 "$SCRIPT_DIR/tools/generate_stacks.py" ${gen_args[@]+"${gen_args[@]}"}
+}
+
+cmd_sync() {
+	local QUIET=false
+
+	while [[ $# -gt 0 ]]; do
+		case "${1:-}" in
+			-q|--quiet)
+				QUIET=true; shift ;;
+			-h|--help)
+				log "Check if stacks/ is in sync with compose sources. Exits 1 on drift."; exit 0 ;;
+			--)
+				shift; break ;;
+			-*)
+				printf '%s: unknown option for sync: %s\n' "$SCRIPT_NAME" "$1" >&2; exit 2 ;;
+			*)
+				break ;;
+		esac
+	done
+
+	if ! command -v python3 >/dev/null 2>&1; then
+		err "python3 is required for 'sync'"
+		exit 2
+	fi
+
+	local tmp_dir
+	tmp_dir="$(mktemp -d)"
+	trap "rm -rf '$tmp_dir'" EXIT
+
+	[[ "$QUIET" = false ]] && log "Checking stack drift (generating to temp dir)..."
+	python3 "$SCRIPT_DIR/tools/generate_stacks.py" --output-dir "$tmp_dir" 2>/dev/null || true
+
+	local drift=false
+	for stack in "${STACK_FILES[@]}"; do
+		local generated="$tmp_dir/${stack}.yml"
+		local current="$STACKS_DIR/${stack}.yml"
+		if [[ ! -f "$generated" ]]; then
+			log "Warning: generator produced no output for: $stack"
+			continue
+		fi
+		if [[ ! -f "$current" ]]; then
+			log "DRIFT: $current does not exist (not yet generated)"
+			drift=true
+			continue
+		fi
+		if ! diff -q "$generated" "$current" >/dev/null 2>&1; then
+			drift=true
+			if [[ "$QUIET" = false ]]; then
+				log "DRIFT detected in: $stack"
+				diff "$current" "$generated" || true
+			else
+				log "DRIFT: $stack"
+			fi
+		else
+			[[ "$QUIET" = false ]] && log "OK: $stack is in sync"
+		fi
+	done
+
+	rm -rf "$tmp_dir"
+	trap - EXIT
+
+	if [[ "$drift" = true ]]; then
+		[[ "$QUIET" = false ]] && log "Drift detected. Run: $SCRIPT_NAME generate"
+		exit 1
+	fi
+	[[ "$QUIET" = false ]] && log "All stacks are in sync with compose sources."
+}
+
 cmd_up() {
 	local FOLLOW_LOGS=true
 	local DRY_RUN=false
+	local SKIP_GENERATE=false
 	TARGET_STACKS=("${STACK_FILES[@]}")
 
 	while [[ $# -gt 0 ]]; do
@@ -420,11 +516,13 @@ cmd_up() {
 				FOLLOW_LOGS=false; shift ;;
 			--dry-run)
 				DRY_RUN=true; shift ;;
+			--skip-generate)
+				SKIP_GENERATE=true; shift ;;
 			-s|--stacks)
 				[[ $# -lt 2 ]] && { err "--stacks requires a value"; exit 2; }
 				set_target_stacks "${2:-}"; shift 2 ;;
 			-h|--help)
-				log "Deploy stacks and optionally follow logs. Options: -n/--no-logs, --dry-run, -s/--stacks <list> (comma-separated: ${STACK_FILES[*]})"; exit 0 ;;
+				log "Deploy stacks and optionally follow logs. Options: -n/--no-logs, --dry-run, --skip-generate, -s/--stacks <list> (comma-separated: ${STACK_FILES[*]})"; exit 0 ;;
 			--)
 				shift; break ;;
 			-*)
@@ -438,22 +536,51 @@ cmd_up() {
 	ensure_swarm_info
 	ensure_traefik_network "$DRY_RUN"
 
+	# Auto-regenerate stacks when any compose/fragment source is newer than the oldest stack file
+	if [[ "$SKIP_GENERATE" = false ]] && command -v python3 >/dev/null 2>&1; then
+		local _oldest=9999999999 _needs_regen=false _mt
+		for _s in "${TARGET_STACKS[@]}"; do
+			if [[ ! -f "$STACKS_DIR/${_s}.yml" ]]; then
+				_needs_regen=true; break
+			fi
+			_mt="$(stat -f '%m' "$STACKS_DIR/${_s}.yml" 2>/dev/null || stat -c '%Y' "$STACKS_DIR/${_s}.yml" 2>/dev/null || echo 0)"
+			[[ "$_mt" -lt "$_oldest" ]] && _oldest="$_mt"
+		done
+		if [[ "$_needs_regen" = false ]]; then
+			while IFS= read -r _src; do
+				[[ -z "$_src" ]] && continue
+				_mt="$(stat -f '%m' "$_src" 2>/dev/null || stat -c '%Y' "$_src" 2>/dev/null || echo 0)"
+				if [[ "$_mt" -gt "$_oldest" ]]; then _needs_regen=true; break; fi
+			done < <(find "$SCRIPT_DIR" -type f \( -name 'docker-compose.yml' -o -name 'docker-compose.yaml' -o -name 'swarm.fragment.yml' \) 2>/dev/null || true)
+		fi
+		if [[ "$_needs_regen" = true ]]; then
+			log "Source files are newer than stacks/ — auto-regenerating..."
+			if [[ "$DRY_RUN" = true ]]; then
+				log "DRY-RUN: would run: python3 $SCRIPT_DIR/tools/generate_stacks.py"
+			else
+				python3 "$SCRIPT_DIR/tools/generate_stacks.py"
+			fi
+		fi
+	fi
+
 	for stack in "${TARGET_STACKS[@]}"; do
 		local file
 		if ! file="$(find_stack_file "$stack")"; then
 			err "Stack file not found for '$stack' in stacks/ or repo root (.yml/.yaml) -- skipping"
 			continue
 		fi
-		# Render into a temporary sibling file to resolve service-level env vars in labels/commands/etc.
+		# Render stacks/*.yml → .rendered/*.rendered.yml before deploying.
+		# The render step substitutes ${VAR} in labels/commands/healthchecks using
+		# each service's env_file(s). The rendered file is git-ignored; the source
+		# stack file (with placeholders) is what gets committed.
 		local render_file
-		render_file="$(render_compose_file "$file")"
+		render_file="$(render_stack_file "$file")"
 		if [[ "$DRY_RUN" = true ]]; then
 			log "DRY-RUN: would run: docker stack deploy -c $render_file $stack"
-			log "DRY-RUN: validating compose file: $render_file"
-			# Suppress the full rendered YAML output; keep warnings/errors on stderr visible
+			log "DRY-RUN: validating rendered file: $render_file"
 			compose_config "$render_file" >/dev/null || true
 		else
-			log "Deploying stack: $stack (file: $render_file)"
+			log "Deploying stack: $stack (rendered: $render_file)"
 			docker stack deploy -c "$render_file" "$stack"
 		fi
 	done
@@ -634,15 +761,15 @@ cmd_doctor() {
 	for stack in "${STACK_FILES[@]}"; do
 		if file_path="$(find_stack_file "$stack")"; then
 			log "OK: found stack file for '$stack': $file_path"
-			# Attempt to render first for accurate validation
-			local rendered
-			rendered="$(render_compose_file "$file_path")"
+			# Render stacks/*.yml → .rendered/ so compose_config sees fully-resolved vars
+			local render_file
+			render_file="$(render_stack_file "$file_path")"
 			local validated=false
-			if compose_config "$rendered" >/dev/null 2>&1; then
-				log "OK: '$stack' compose syntax valid (validated: $rendered)"
+			if compose_config "$render_file" >/dev/null 2>&1; then
+				log "OK: '$stack' compose syntax valid (rendered: $render_file)"
 				validated=true
 			else
-				err "Validation failed for '$stack' ($rendered)"
+				err "Validation failed for '$stack' (rendered: $render_file)"
 			fi
 
 			# Optionally ensure external named volumes exist
@@ -667,7 +794,7 @@ cmd_doctor() {
 				    }
 				  }
 				  END { if (keyname != "" && ext == 1) { if (volname != "") print volname; else print keyname; } }
-				' "$rendered") || true
+				' "$render_file") || true
 				if [[ -n "$vol_names" ]]; then
 					while IFS= read -r vol; do
 						[[ -z "$vol" ]] && continue
@@ -682,8 +809,8 @@ cmd_doctor() {
 			fi
 			# Re-validate after creating volumes if initial validation failed
 			if [[ "$FIX_VOLUMES" = true && "$validated" = false ]]; then
-				if compose_config "$rendered" >/dev/null 2>&1; then
-					log "OK: '$stack' compose syntax valid after fixing volumes (validated: $rendered)"
+				if compose_config "$render_file" >/dev/null 2>&1; then
+					log "OK: '$stack' compose syntax valid after fixing volumes (rendered: $render_file)"
 					validated=true
 				fi
 			fi
@@ -695,6 +822,22 @@ cmd_doctor() {
 			overall_ok=false
 		fi
 	done
+
+	# x-stack annotation check
+	log "Checking x-stack annotations in compose files..."
+	local missing_xstack=0
+	while IFS= read -r _cf; do
+		[[ -z "$_cf" ]] && continue
+		if ! grep -q '^x-stack:' "$_cf" 2>/dev/null; then
+			log "NOTE: missing x-stack: in $_cf"
+			missing_xstack=$((missing_xstack+1))
+		fi
+	done < <(find "$SCRIPT_DIR" -mindepth 2 -maxdepth 4 -type f \( -name 'docker-compose.yml' -o -name 'docker-compose.yaml' \) 2>/dev/null || true)
+	if [[ "$missing_xstack" -eq 0 ]]; then
+		log "OK: all compose files have x-stack annotations"
+	else
+		log "NOTE: $missing_xstack compose file(s) missing x-stack annotation"
+	fi
 
 	# .env hints for service directories that have docker-compose files
 	log "Scanning service folders for .env hints..."
@@ -733,7 +876,7 @@ cmd_doctor() {
 # Determine subcommand (default: up)
 SUBCOMMAND="${1:-}"
 case "$SUBCOMMAND" in
-	up|down|status|logs|doctor|env|help|-h|--help)
+	up|down|status|logs|doctor|env|generate|sync|help|-h|--help)
 		[[ $# -gt 0 ]] && shift || true ;;
 	*)
 		SUBCOMMAND="up" ;;
@@ -750,6 +893,10 @@ case "$SUBCOMMAND" in
 		cmd_logs "$@" ;;
 	env)
 		cmd_env "$@" ;;
+	generate)
+		cmd_generate "$@" ;;
+	sync)
+		cmd_sync "$@" ;;
 	doctor)
 		cmd_doctor "$@" ;;
 	help|-h|--help)

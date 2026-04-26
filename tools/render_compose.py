@@ -23,18 +23,41 @@ Notes:
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import re
 import sys
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, IO, List, Mapping, Optional, Protocol, cast
+
+
+class _YamlEngine(Protocol):
+    preserve_quotes: bool
+    width: int
+
+    def indent(self, mapping: int = 2, sequence: int = 2, offset: int = 0) -> None: ...
+
+    def load(self, stream: IO[str]) -> Any: ...
+
+    def dump(self, data: Any, stream: IO[str]) -> None: ...
 
 try:
-    import yaml  # type: ignore
-except Exception as e:  # pragma: no cover
+    from ruamel.yaml import YAML as _YAML  # type: ignore
+    _yaml: _YamlEngine = cast(_YamlEngine, _YAML())
+    _yaml.preserve_quotes = True
+    # Keep list items visually nested under their keys.
+    _yaml.indent(mapping=2, sequence=4, offset=2)
+    _yaml.width = 2 ** 20  # prevent unwanted line wrapping
+except ImportError:  # pragma: no cover
     sys.stderr.write(
-        "ERROR: PyYAML is required. Install with: pip3 install -r tools/requirements.txt\n"
+        "ERROR: ruamel.yaml is required. Install with: pip3 install -r tools/requirements.txt\n"
     )
     sys.exit(2)
+
+# PyYAML kept only for VAR_PATTERN / PLAIN_PATTERN regex usage below
+try:
+    import yaml  # type: ignore  # noqa: F401 — used only as a lightweight string check
+except ImportError:  # pragma: no cover
+    yaml = None  # type: ignore
 
 
 VAR_PATTERN = re.compile(r"\$\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:(?P<sep>:-|-)\s*(?P<default>[^}]*))?\}")
@@ -78,12 +101,12 @@ def coerce_to_dict(env: Any) -> Dict[str, str]:
     if env is None:
         return result
     if isinstance(env, Mapping):
-        for k, v in env.items():
+        for k, v in cast(Mapping[Any, Any], env).items():
             if v is None:
                 v = ""
             result[str(k)] = str(v)
     elif isinstance(env, list):
-        for item in env:
+        for item in cast(List[Any], env):
             if isinstance(item, str) and "=" in item:
                 k, v = item.split("=", 1)
                 result[k] = v
@@ -126,7 +149,8 @@ def build_service_scope_vars(
     if isinstance(env_file_val, str):
         env_files = [env_file_val]
     elif isinstance(env_file_val, list):
-        env_files = [e for e in env_file_val if isinstance(e, str)]
+        env_file_items = cast(List[Any], env_file_val)
+        env_files = [e for e in env_file_items if isinstance(e, str)]
 
     for rel_path in env_files:
         env_path = resolve_env_path(rel_path, project_dir, repo_root)
@@ -167,13 +191,14 @@ def absolutize_service_paths(service: Dict[str, Any], project_dir: str, repo_roo
         if isinstance(ef, str):
             service["env_file"] = to_abs(ef)
         elif isinstance(ef, list):
-            service["env_file"] = [to_abs(x) if isinstance(x, str) else x for x in ef]
+            ef_list = cast(List[Any], ef)
+            service["env_file"] = [to_abs(x) if isinstance(x, str) else x for x in ef_list]
 
     # volumes: list of strings or dictionaries
     vols = service.get("volumes")
     if isinstance(vols, list):
-        new_vols = []
-        for v in vols:
+        new_vols: List[Any] = []
+        for v in cast(List[Any], vols):
             if isinstance(v, str):
                 # Format: src:dest[:mode]
                 parts = v.split(":")
@@ -188,12 +213,13 @@ def absolutize_service_paths(service: Dict[str, Any], project_dir: str, repo_roo
                             v = ":".join(parts)
                 new_vols.append(v)
             elif isinstance(v, dict):
-                vtype = v.get("type")
+                vd = cast(Dict[str, Any], v)
+                vtype = vd.get("type")
                 if vtype == "bind":
-                    src = v.get("source")
+                    src = vd.get("source")
                     if isinstance(src, str):
-                        v["source"] = to_abs(src)
-                new_vols.append(v)
+                        vd["source"] = to_abs(src)
+                new_vols.append(vd)
             else:
                 new_vols.append(v)
         service["volumes"] = new_vols
@@ -246,9 +272,11 @@ def deep_interpolate(obj: Any, vars_map: Mapping[str, str]) -> Any:
     if isinstance(obj, str):
         return substitute(obj, vars_map)
     if isinstance(obj, list):
-        return [deep_interpolate(x, vars_map) for x in obj]
+        items = cast(List[Any], obj)
+        return [deep_interpolate(x, vars_map) for x in items]
     if isinstance(obj, dict):
-        return {k: deep_interpolate(v, vars_map) for k, v in obj.items()}
+        dct = cast(Dict[str, Any], obj)
+        return {k: deep_interpolate(v, vars_map) for k, v in dct.items()}
     return obj
 
 
@@ -261,14 +289,16 @@ def render_compose(data: Dict[str, Any], project_dir: str, repo_root: Optional[s
         return data
 
     rendered_services: Dict[str, Any] = {}
-    for name, svc in services.items():
+    services_dict = cast(Dict[str, Any], services)
+    for name, svc in services_dict.items():
         if not isinstance(svc, dict):
             rendered_services[name] = svc
             continue
+        svc_dict = cast(Dict[str, Any], svc)
         # Make service file paths absolute so rendered YAML can be used from a different directory
-        absolutize_service_paths(svc, project_dir, repo_root)
-        scope_vars = build_service_scope_vars(svc, base_env, project_dir, repo_root)
-        rendered_services[name] = deep_interpolate(svc, scope_vars)
+        absolutize_service_paths(svc_dict, project_dir, repo_root)
+        scope_vars = build_service_scope_vars(svc_dict, base_env, project_dir, repo_root)
+        rendered_services[name] = deep_interpolate(svc_dict, scope_vars)
 
     data = dict(data)
     data["services"] = rendered_services
@@ -299,13 +329,16 @@ def main() -> int:
             repo_root = project_dir
 
     with open(in_path, "r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh) or {}
+        loaded = _yaml.load(fh)
+    data = cast(Dict[str, Any], loaded) if isinstance(loaded, dict) else {}
 
     rendered = render_compose(data, project_dir, repo_root)
 
     # Optional strict check
     if args.strict:
-        text_dump = yaml.safe_dump(rendered, sort_keys=False)
+        buf = io.StringIO()
+        _yaml.dump(rendered, buf)
+        text_dump = buf.getvalue()
         unresolved = VAR_PATTERN.findall(text_dump)
         if unresolved:
             names = ", ".join(sorted(set(n for (n, _sep, _def) in unresolved if n)))
@@ -315,7 +348,7 @@ def main() -> int:
     # Ensure output directory exists
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as fh:
-        yaml.safe_dump(rendered, fh, sort_keys=False)
+        _yaml.dump(rendered, fh)
 
     print(out_path)
     return 0

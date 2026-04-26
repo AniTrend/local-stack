@@ -1,4 +1,5 @@
 ---
+x-stack: platform
 volumes:
   uploads:
     name: 'growthbook_dashboard-uploads'
@@ -32,7 +33,7 @@ services:
     logging:
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: 3
     healthcheck:
       test: ['CMD', 'wget', 'http://localhost:${API_PORT}']
       interval: 20s
