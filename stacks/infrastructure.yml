@@ -3,6 +3,9 @@ volumes:
   cache:
     external: true
     name: apisix-cache
+  data:
+    external: true
+    name: postgres-data
   etcd-data:
     external: true
     name: etcd-data
@@ -12,9 +15,6 @@ volumes:
   portainer-data:
     external: true
     name: portainer-data
-  data:
-    external: true
-    name: postgres-data
   traefik-ssl-certs:
     external: true
     name: traefik_traefik-ssl-certs
@@ -26,19 +26,19 @@ services:
   apisix_dashboard:
     image: apache/apisix-dashboard:3.0.1-alpine
     networks:
-    - default
+      - default
     env_file:
-    - ./apisix/api-dashboard/.env
+      - ./apisix/api-dashboard/.env
     volumes:
-    - ./apisix/api-dashboard/config/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
+      - ./apisix/api-dashboard/config/conf.yaml:/usr/local/apisix-dashboard/conf/conf.yaml:ro
     labels:
-    - traefik.enable=${TRAEFIK_ENABLE}
-    - traefik.http.routers.apisix-dashboard.rule=Host(`${HOST}`)
-    - traefik.http.routers.apisix-dashboard.entrypoints=web,websecure
-    - traefik.http.routers.apisix-dashboard.service=apisix-dashboard
-    - traefik.http.routers.apisix-dashboard.tls=true
-    - traefik.http.routers.apisix-dashboard.tls.certresolver=${CERT_RESOLVER}
-    - traefik.http.services.apisix-dashboard.loadbalancer.server.port=${PORT}
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.http.routers.apisix-dashboard.rule=Host(`${HOST}`)
+      - traefik.http.routers.apisix-dashboard.entrypoints=web,websecure
+      - traefik.http.routers.apisix-dashboard.service=apisix-dashboard
+      - traefik.http.routers.apisix-dashboard.tls=true
+      - traefik.http.routers.apisix-dashboard.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.services.apisix-dashboard.loadbalancer.server.port=${PORT}
     logging:
       options:
         max-size: 10m
@@ -47,7 +47,7 @@ services:
       mode: global
       placement:
         constraints:
-        - node.role == manager
+          - node.role == manager
       resources:
         reservations:
           memory: 64M
@@ -56,20 +56,20 @@ services:
   apisix_gateway:
     image: apache/apisix:3.16.0-debian
     networks:
-    - default
+      - default
     env_file:
-    - ./apisix/api-gateway/.env
+      - ./apisix/api-gateway/.env
     volumes:
-    - ./apisix/api-gateway/config/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
-    - cache:/tmp/apisix-cache/
+      - ./apisix/api-gateway/config/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - cache:/tmp/apisix-cache/
     labels:
-    - traefik.enable=${TRAEFIK_ENABLE}
-    - traefik.http.routers.apisix.rule=Host(`${HOST}`)
-    - traefik.http.routers.apisix.entrypoints=web,websecure
-    - traefik.http.routers.apisix.service=apisix
-    - traefik.http.routers.apisix.tls=true
-    - traefik.http.routers.apisix.tls.certresolver=${CERT_RESOLVER}
-    - traefik.http.services.apisix.loadbalancer.server.port=${PORT}
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.http.routers.apisix.rule=Host(`${HOST}`)
+      - traefik.http.routers.apisix.entrypoints=web,websecure
+      - traefik.http.routers.apisix.service=apisix
+      - traefik.http.routers.apisix.tls=true
+      - traefik.http.routers.apisix.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.services.apisix.loadbalancer.server.port=${PORT}
     logging:
       options:
         max-size: 10m
@@ -78,7 +78,7 @@ services:
       mode: global
       placement:
         constraints:
-        - node.role == manager
+          - node.role == manager
       resources:
         reservations:
           memory: 128M
@@ -89,11 +89,11 @@ services:
   etcd:
     image: bitnamilegacy/etcd:3.6.4
     networks:
-    - default
+      - default
     env_file:
-    - ./apisix/etcd/.env
+      - ./apisix/etcd/.env
     volumes:
-    - etcd-data:/bitnami/etcd
+      - etcd-data:/bitnami/etcd
     logging:
       options:
         max-size: 10m
@@ -107,21 +107,21 @@ services:
   mongo:
     image: mongo:8.2.7
     networks:
-    - default
+      - default
     env_file:
-    - ./mongo/.env
+      - ./mongo/.env
     volumes:
-    - mongo-data:/data
-    - mongo-data:/data/db
-    - mongo-data:/data/configdb
+      - mongo-data:/data
+      - mongo-data:/data/db
+      - mongo-data:/data/configdb
     labels:
-    - traefik.enable=${TRAEFIK_ENABLE}
-    - traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)
-    - traefik.tcp.routers.mongo.entrypoints=websecure
-    - traefik.tcp.routers.mongo.service=mongo
-    - traefik.tcp.routers.mongo.tls=true
-    - traefik.tcp.routers.mongo.tls.certresolver=${CERT_RESOLVER}
-    - traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)
+      - traefik.tcp.routers.mongo.entrypoints=websecure
+      - traefik.tcp.routers.mongo.service=mongo
+      - traefik.tcp.routers.mongo.tls=true
+      - traefik.tcp.routers.mongo.tls.certresolver=${CERT_RESOLVER}
+      - traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}
     deploy:
       resources:
         reservations:
@@ -136,19 +136,19 @@ services:
   portainer:
     image: portainer/portainer-ee:2.40.0
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    - portainer-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
     env_file: ./portainer/.env
     labels:
-    - traefik.enable=${TRAEFIK_ENABLE}
-    - traefik.http.routers.portainer.rule=Host(`${HOST}`)
-    - traefik.http.services.portainer.loadbalancer.server.port=${PORT}
-    - traefik.http.routers.portainer.entrypoints=web,websecure
-    - traefik.http.routers.portainer.service=portainer
-    - traefik.http.routers.portainer.tls=true
-    - traefik.http.routers.portainer.tls.certresolver=${CERT_RESOLVER}
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.http.routers.portainer.rule=Host(`${HOST}`)
+      - traefik.http.services.portainer.loadbalancer.server.port=${PORT}
+      - traefik.http.routers.portainer.entrypoints=web,websecure
+      - traefik.http.routers.portainer.service=portainer
+      - traefik.http.routers.portainer.tls=true
+      - traefik.http.routers.portainer.tls.certresolver=${CERT_RESOLVER}
     networks:
-    - default
+      - default
     logging:
       options:
         max-size: 10m
@@ -157,7 +157,7 @@ services:
       mode: global
       placement:
         constraints:
-        - node.role == manager
+          - node.role == manager
       restart_policy:
         condition: any
       resources:
@@ -170,18 +170,18 @@ services:
   postgres:
     image: postgres:18
     networks:
-    - default
+      - default
     volumes:
-    - data:/var/lib/postgresql
+      - data:/var/lib/postgresql
     env_file: ./postgres/.env
     labels:
-    - traefik.enable=${TRAEFIK_ENABLE}
-    - traefik.tcp.routers.postgres.rule=HostSNI(`${HOST}`)
-    - traefik.tcp.routers.postgres.entrypoints=websecure
-    - traefik.tcp.routers.postgres.service=postgres
-    - traefik.tcp.routers.postgres.tls=true
-    - traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}
-    - traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.tcp.routers.postgres.rule=HostSNI(`${HOST}`)
+      - traefik.tcp.routers.postgres.entrypoints=websecure
+      - traefik.tcp.routers.postgres.service=postgres
+      - traefik.tcp.routers.postgres.tls=true
+      - traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}
+      - traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}
     logging:
       options:
         max-size: 10m
@@ -195,17 +195,17 @@ services:
   redis:
     image: redis:8.6-alpine
     networks:
-    - default
+      - default
     command: redis-server --appendonly yes
     env_file: ./redis/.env
     labels:
-    - traefik.enable=${TRAEFIK_ENABLE}
-    - traefik.tcp.routers.redis.rule=HostSNI(`${HOST}`)
-    - traefik.tcp.routers.redis.entrypoints=websecure
-    - traefik.tcp.routers.redis.service=redis
-    - traefik.tcp.routers.redis.tls=true
-    - traefik.tcp.routers.redis.tls.certresolver=${CERT_RESOLVER}
-    - traefik.tcp.services.redis.loadbalancer.server.port=${PORT}
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.tcp.routers.redis.rule=HostSNI(`${HOST}`)
+      - traefik.tcp.routers.redis.entrypoints=websecure
+      - traefik.tcp.routers.redis.service=redis
+      - traefik.tcp.routers.redis.tls=true
+      - traefik.tcp.routers.redis.tls.certresolver=${CERT_RESOLVER}
+      - traefik.tcp.services.redis.loadbalancer.server.port=${PORT}
     logging:
       options:
         max-size: 10m
@@ -219,30 +219,30 @@ services:
   traefik:
     image: traefik:v3.6
     networks:
-    - default
+      - default
     ports:
-    - 80:80
-    - 443:443
+      - 80:80
+      - 443:443
     env_file: ./traefik/.env
     volumes:
-    - traefik-ssl-certs:/etc/traefik/certs
-    - ./traefik/auth/htpasswd:/etc/htpasswd:ro
-    - ./traefik/config/traefik.yml:/etc/traefik/traefik.yml:ro
-    - ./traefik/config/dynamic.yml:/etc/traefik/dynamic.yml:ro
-    - /var/run/docker.sock:/var/run/docker.sock:ro
-    - /var/run/tailscale:/var/run/tailscale:ro
+      - traefik-ssl-certs:/etc/traefik/certs
+      - ./traefik/auth/htpasswd:/etc/htpasswd:ro
+      - ./traefik/config/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/config/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/tailscale:/var/run/tailscale:ro
     labels:
-    - traefik.enable=${TRAEFIK_ENABLE}
-    - traefik.http.routers.traefik-ui.rule=Host(`${HOST}`)
-    - traefik.http.routers.traefik-ui.entrypoints=web,websecure
-    - traefik.http.routers.traefik-ui.service=api@internal
-    - traefik.http.routers.traefik-ui.middlewares=sso
-    - traefik.http.routers.traefik-ui.tls=true
-    - traefik.http.routers.traefik-ui.tls.certresolver=${CERT_RESOLVER}
-    - traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}
-    - traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}
-    - traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}
-    - traefik.http.services.traefik-ui.loadbalancer.server.port=${PORT}
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.http.routers.traefik-ui.rule=Host(`${HOST}`)
+      - traefik.http.routers.traefik-ui.entrypoints=web,websecure
+      - traefik.http.routers.traefik-ui.service=api@internal
+      - traefik.http.routers.traefik-ui.middlewares=sso
+      - traefik.http.routers.traefik-ui.tls=true
+      - traefik.http.routers.traefik-ui.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.middlewares.sso.plugin.trauth.domain=${TRUEAUTH_DOMAIN}
+      - traefik.http.middlewares.sso.plugin.trauth.cookiename=${TRUEAUTH_COOKIE}
+      - traefik.http.middlewares.sso.plugin.trauth.users=${SSO_CREDENTIALS}
+      - traefik.http.services.traefik-ui.loadbalancer.server.port=${PORT}
     logging:
       options:
         max-size: 10m
@@ -251,7 +251,7 @@ services:
       mode: global
       placement:
         constraints:
-        - node.role == manager
+          - node.role == manager
       restart_policy:
         condition: any
       resources:

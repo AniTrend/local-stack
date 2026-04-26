@@ -33,6 +33,22 @@ except ImportError:  # pragma: no cover
     sys.stderr.write("ERROR: PyYAML is required. pip3 install PyYAML\n")
     sys.exit(2)
 
+
+class _IndentedSafeDumper(yaml.SafeDumper):
+    """PyYAML dumper that indents list items under their parent key.
+
+    Default PyYAML formatting emits:
+        key:
+        - item
+
+    We prefer:
+        key:
+          - item
+    """
+
+    def increase_indent(self, flow=False, indentless=False):  # type: ignore[override]
+        return super().increase_indent(flow, False)
+
 # ---------------------------------------------------------------------------
 # Public functions (also imported by tests)
 # ---------------------------------------------------------------------------
@@ -235,7 +251,7 @@ def generate_stack(
     # volume_key -> optional metadata dict (may contain 'name' override)
     all_volume_meta: Dict[str, Dict[str, Any]] = {}
 
-    for compose_path in compose_paths:
+    for compose_path in sorted(compose_paths):
         project_dir = os.path.dirname(os.path.abspath(compose_path))
 
         # --- load compose + fragment ---
@@ -269,7 +285,7 @@ def generate_stack(
             svc = _rewrite_bind_mount_paths(svc, project_dir, repo_root)
 
             # Collect named volumes for this service
-            for vol_key in collect_named_volumes(svc.get("volumes", [])):
+            for vol_key in sorted(collect_named_volumes(svc.get("volumes", []))):
                 if vol_key not in all_volume_meta:
                     meta = top_volumes.get(vol_key)
                     all_volume_meta[vol_key] = meta if isinstance(meta, dict) else {}
@@ -290,7 +306,8 @@ def generate_stack(
     # volumes block
     if all_volume_meta:
         volumes_out: Dict[str, Any] = {}
-        for vol_key, meta in all_volume_meta.items():
+        for vol_key in sorted(all_volume_meta):
+            meta = all_volume_meta[vol_key]
             entry: Dict[str, Any] = {"external": True}
             if meta and meta.get("name"):
                 entry["name"] = meta["name"]
@@ -392,7 +409,9 @@ def main() -> int:
 
         yaml_str = yaml.dump(
             stack_data,
+            Dumper=_IndentedSafeDumper,
             default_flow_style=False,
+            indent=2,
             sort_keys=False,
             allow_unicode=True,
         )
