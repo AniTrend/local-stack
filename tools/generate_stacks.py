@@ -25,7 +25,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Set, Tuple, cast
 
 try:
     import yaml  # type: ignore
@@ -77,7 +77,7 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
     result: Dict[str, Any] = dict(base)
     for key, val in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(val, dict):
-            result[key] = deep_merge(result[key], val)
+            result[key] = deep_merge(cast(Dict[str, Any], result[key]), cast(Dict[str, Any], val))
         else:
             # Scalars and lists: override replaces
             result[key] = val
@@ -100,16 +100,17 @@ def collect_named_volumes(volumes: List[Any]) -> Set[str]:
     with ``.``, ``/``, or ``~``.  Only the part before the first ``:`` is used.
     """
     named: Set[str] = set()
-    for v in volumes or []:
+    for v in (volumes or []):
         if isinstance(v, str):
             src = v.split(":")[0]
             if not (src.startswith(".") or src.startswith("/") or src.startswith("~")):
                 named.add(src)
         elif isinstance(v, dict):
-            if v.get("type") == "volume":
-                src = v.get("source")
+            vd = cast(Dict[str, Any], v)
+            if vd.get("type") == "volume":
+                src = vd.get("source")
                 if src:
-                    named.add(src)
+                    named.add(str(src))
     return named
 
 
@@ -150,8 +151,8 @@ def load_fragment(directory: str) -> Dict[str, Any]:
     if not os.path.isfile(frag_path):
         return {}
     with open(frag_path, "r", encoding="utf-8") as fh:
-        data = yaml.safe_load(fh) or {}
-    return data
+        loaded = yaml.safe_load(fh)
+    return cast(Dict[str, Any], loaded) if isinstance(loaded, dict) else {}
 
 
 def _rewrite_env_file(service: Dict[str, Any], project_dir: str, repo_root: str) -> Dict[str, Any]:
@@ -176,7 +177,8 @@ def _rewrite_env_file(service: Dict[str, Any], project_dir: str, repo_root: str)
     if isinstance(ef, str):
         service["env_file"] = _to_repo_rel(ef)
     elif isinstance(ef, list):
-        service["env_file"] = [_to_repo_rel(e) if isinstance(e, str) else e for e in ef]
+        ef_list = cast(List[Any], ef)
+        service["env_file"] = [_to_repo_rel(e) if isinstance(e, str) else e for e in ef_list]
     return service
 
 
@@ -195,7 +197,7 @@ def _rewrite_bind_mount_paths(service: Dict[str, Any], project_dir: str, repo_ro
 
     service = dict(service)
     new_vols: List[Any] = []
-    for v in service["volumes"]:
+    for v in cast(List[Any], service["volumes"]):
         if isinstance(v, str):
             parts = v.split(":")
             src = parts[0]
@@ -205,26 +207,21 @@ def _rewrite_bind_mount_paths(service: Dict[str, Any], project_dir: str, repo_ro
                     parts[0] = _to_repo_rel(src)
                     v = ":".join(parts)
             new_vols.append(v)
-        elif isinstance(v, dict) and v.get("type") == "bind":
-            v = dict(v)
-            src = v.get("source", "")
-            if not os.path.isabs(src):
-                v["source"] = _to_repo_rel(src)
-            new_vols.append(v)
+        elif isinstance(v, dict):
+            vd0 = cast(Dict[str, Any], v)
+            if vd0.get("type") != "bind":
+                new_vols.append(vd0)
+                continue
+            vd = dict(vd0)
+            src = vd.get("source", "")
+            src_s = str(src)
+            if not os.path.isabs(src_s):
+                vd["source"] = _to_repo_rel(src_s)
+            new_vols.append(vd)
         else:
             new_vols.append(v)
     service["volumes"] = new_vols
     return service
-
-
-def _check_unresolved(obj: Any) -> List[str]:
-    """Placeholder kept for test compatibility — returns empty list (no-op).
-
-    Pre-resolution is intentionally not performed at generate time; this
-    function is retained so tests that import it do not break.
-    """
-    return []
-
 
 def generate_stack(
     stack_name: str,
@@ -265,17 +262,20 @@ def generate_stack(
         merged = deep_merge(data, fragment)
 
         # --- top-level volume metadata (name overrides) ---
-        top_volumes: Dict[str, Any] = data.get("volumes") or {}
+        top_vol_raw = data.get("volumes")
+        top_volumes: Dict[str, Any] = cast(Dict[str, Any], top_vol_raw) if isinstance(top_vol_raw, dict) else {}
 
         # --- process services ---
-        services_raw = merged.get("services") or {}
+        services_raw_any = merged.get("services")
+        services_raw: Dict[str, Any] = cast(Dict[str, Any], services_raw_any) if isinstance(services_raw_any, dict) else {}
         for svc_name, svc in services_raw.items():
             if not isinstance(svc, dict):
                 all_services[svc_name] = svc
                 continue
+            svc_dict = cast(Dict[str, Any], svc)
 
             # Strip compose-only keys
-            svc = strip_compose_only_keys(svc)
+            svc = strip_compose_only_keys(svc_dict)
 
             # Inject logging defaults (no-op if service already has logging:)
             svc = apply_logging_defaults(svc)
@@ -295,7 +295,7 @@ def generate_stack(
         # Also register volumes from the top-level volumes section that
         # correspond to named volumes used by ANY service in this file
         # (handles cases where volume key differs from mount source — e.g. postgres 'data')
-        for vol_key, vol_meta in top_volumes.items():
+        for vol_key in top_volumes:
             if vol_key not in all_volume_meta:
                 # Only include if referenced by a service volume mount
                 pass  # already handled above via collect_named_volumes
@@ -343,7 +343,8 @@ def _discover_compose_files(repo_root: str) -> Dict[str, List[str]]:
             compose_path = os.path.join(dirpath, fname)
             try:
                 with open(compose_path, "r", encoding="utf-8") as fh:
-                    data = yaml.safe_load(fh) or {}
+                    loaded = yaml.safe_load(fh)
+                data: Dict[str, Any] = cast(Dict[str, Any], loaded) if isinstance(loaded, dict) else {}
                 stack_name = data.get("x-stack")
                 if not stack_name:
                     continue
