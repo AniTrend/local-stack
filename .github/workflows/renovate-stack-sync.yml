@@ -31,7 +31,7 @@ jobs:
         run: python3 tools/generate_stacks.py
 
       - name: Commit regenerated stacks when drift exists
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "chore(stacks): sync generated stacks for renovate update"
           file_pattern: stacks/*.yml
