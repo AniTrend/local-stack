@@ -2,7 +2,7 @@ x-stack: platform
 services:
   website:
     container_name: website
-    image: ghcr.io/anitrend/website:0.4.0
+    image: ghcr.io/anitrend/website:0.4.1
     networks:
       - default
     env_file: .env
