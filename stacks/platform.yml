@@ -182,7 +182,7 @@ services:
           memory: 384M
           cpus: '0.50'
   website:
-    image: ghcr.io/anitrend/website:0.4.0
+    image: ghcr.io/anitrend/website:0.4.1
     networks:
       - default
     env_file: ./website/.env
