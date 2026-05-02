@@ -1,38 +1,30 @@
-<!-- code-review-graph MCP tools -->
-## MCP Tools: code-review-graph
+# Local-Stack Agent Guide
 
-**IMPORTANT: This project has a knowledge graph. ALWAYS use the
-code-review-graph MCP tools BEFORE using Grep/Glob/Read to explore
-the codebase.** The graph is faster, cheaper (fewer tokens), and gives
-you structural context (callers, dependents, test coverage) that file
-scanning cannot.
+Local-Stack is migrating from per-service Compose to modular Docker Swarm stacks. Keep agent guidance short, link to the canonical docs, and prefer editing the owning service or stack source instead of duplicating context here.
 
-### When to use graph tools FIRST
+## Source Of Truth
 
-- **Exploring code**: `semantic_search_nodes` or `query_graph` instead of Grep
-- **Understanding impact**: `get_impact_radius` instead of manually tracing imports
-- **Code review**: `detect_changes` + `get_review_context` instead of reading entire files
-- **Finding relationships**: `query_graph` with callers_of/callees_of/imports_of/tests_for
-- **Architecture questions**: `get_architecture_overview` + `list_communities`
+- Service folders are the source of truth for config: `traefik/`, `apisix/`, `observability/`, `postgres/`, `mongo/`, `redis/`, `growthbook/`, `portainer/`, `anitrend/`, `on-the-edge/`, `edge-graphql/`, `website/`, and `beszel/`.
+- Generated Swarm stacks live in `stacks/`. Do not edit the rendered stack output directly; regenerate with `./stackctl.sh generate` or sync with `./stackctl.sh sync`. See [stacks/README.md](stacks/README.md).
+- Deprecated root-level `swarm.*.yml` files are not used for deployment.
 
-Fall back to Grep/Glob/Read **only** when the graph doesn't cover what you need.
+## How To Work
 
-### Key Tools
+- For full-environment deploys and validation, follow [stacks/README.md](stacks/README.md) and the `./stackctl.sh` workflow.
+- For service-local changes, update the service folder’s `docker-compose.yml`, `swarm.fragment.yml`, and `.env.example` together when needed.
+- Keep exposed services attached to the shared `traefik-public` network and route them with Traefik labels and [traefik/config/dynamic.yml](traefik/config/dynamic.yml).
+- Update Grafana provisioning under [observability/grafana/config/provisioning/](observability/grafana/config/provisioning/) when dashboards or datasources change.
 
-| Tool | Use when |
-|------|----------|
-| `detect_changes` | Reviewing code changes — gives risk-scored analysis |
-| `get_review_context` | Need source snippets for review — token-efficient |
-| `get_impact_radius` | Understanding blast radius of a change |
-| `get_affected_flows` | Finding which execution paths are impacted |
-| `query_graph` | Tracing callers, callees, imports, tests, dependencies |
-| `semantic_search_nodes` | Finding functions/classes by name or keyword |
-| `get_architecture_overview` | Understanding high-level codebase structure |
-| `refactor_tool` | Planning renames, finding dead code |
+## Change Rules
 
-### Workflow
+- Prefer pinned GHCR tags; avoid `latest`.
+- Do not assume `.env` files exist. If a new variable is needed, update the matching `.env.example`.
+- For edge-facing apps, include Traefik router/service labels and a healthcheck that matches the exposed endpoint.
+- Keep secrets out of source; prefer environment variables and the guidance in [docs/Managing Secrets.md](docs/Managing%20Secrets.md).
 
-1. The graph auto-updates on file changes (via hooks).
-2. Use `detect_changes` for code review.
-3. Use `get_affected_flows` to understand impact.
-4. Use `query_graph` pattern="tests_for" to check coverage.
+## Good Starting Docs
+
+- [README.md](README.md)
+- [stacks/README.md](stacks/README.md)
+- [docs/Managing Secrets.md](docs/Managing%20Secrets.md)
+- [docs/Migrating Compose Files to a Modular Docker Swarm  2738a21416308060a700fda5cdcc3b2d.md](docs/Migrating%20Compose%20Files%20to%20a%20Modular%20Docker%20Swarm%20%202738a21416308060a700fda5cdcc3b2d.md)
