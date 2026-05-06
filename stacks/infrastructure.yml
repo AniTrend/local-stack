@@ -217,7 +217,7 @@ services:
         limits:
           memory: 128M
   traefik:
-    image: traefik:v3.6
+    image: traefik:v3.7
     networks:
       - default
     ports:
