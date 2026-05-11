@@ -2,7 +2,7 @@
 x-stack: platform
 services:
   anitrend-edge:
-    image: ghcr.io/anitrend/on-the-edge:1.3.0
+    image: ghcr.io/anitrend/on-the-edge:1.4.0
     container_name: anitrend-edge
     networks:
       - default
