@@ -15,6 +15,12 @@ Local-Stack is migrating from per-service Compose to modular Docker Swarm stacks
 - Keep exposed services attached to the shared `traefik-public` network and route them with Traefik labels and [traefik/config/dynamic.yml](traefik/config/dynamic.yml).
 - Update Grafana provisioning under [observability/grafana/config/provisioning/](observability/grafana/config/provisioning/) when dashboards or datasources change.
 
+## Project Skills
+
+- [project-local-stack-overview](.agents/skills/project-local-stack-overview/SKILL.md) for repo structure, stack ownership, and Swarm migration context.
+- [project-stackctl-changes](.agents/skills/project-stackctl-changes/SKILL.md) for safe, portable edits to `stackctl.sh`.
+- [project-tools-python-utilities](.agents/skills/project-tools-python-utilities/SKILL.md) for Python utility changes under `tools/`.
+
 ## Change Rules
 
 - Prefer pinned GHCR tags; avoid `latest`.

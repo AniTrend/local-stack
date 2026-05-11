@@ -15,11 +15,6 @@ jobs:
     name: Regenerate stacks and open PR if drifted
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          client-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - name: Checkout dev branch
         uses: actions/checkout@v6
         with:
@@ -65,7 +60,7 @@ jobs:
         if: steps.drift.outputs.drifted == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           signoff: true
           delete-branch: true
           commit-message: "chore(stacks): nightly regeneration from compose sources"
