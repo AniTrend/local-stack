@@ -3,7 +3,7 @@ x-stack: infrastructure
 services:
   redis:
     container_name: "redis"
-    image: redis:8.6-alpine
+    image: redis:8.8-alpine
     networks:
       - default
     command: redis-server --appendonly yes
