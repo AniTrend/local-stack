@@ -9,7 +9,7 @@ services:
   growthbook:
     container_name: "growthbook"
     command: ["yarn", "start:with-tracing"]
-    image: "growthbook/growthbook:4.3.0"
+    image: "growthbook/growthbook:4.4.0"
     volumes:
       - uploads:/usr/local/src/app/packages/back-end/uploads
     env_file: .env
