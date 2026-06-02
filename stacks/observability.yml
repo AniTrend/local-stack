@@ -80,7 +80,7 @@ services:
         limits:
           memory: 96M
   grafana:
-    image: grafana/grafana-oss:13.0.1
+    image: grafana/grafana-oss:13.0.2
     volumes:
       - grafana-data:/var/lib/grafana
       - ./observability/grafana/config/provisioning:/etc/grafana/provisioning/
