@@ -152,7 +152,7 @@ services:
         limits:
           memory: 256M
   anitrend-edge:
-    image: ghcr.io/anitrend/on-the-edge:1.5.1
+    image: ghcr.io/anitrend/on-the-edge:1.5.2
     networks:
       - default
     env_file: ./on-the-edge/.env
