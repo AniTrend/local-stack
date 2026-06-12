@@ -105,7 +105,7 @@ services:
         limits:
           memory: 256M
   mongo:
-    image: mongo:8.3.3
+    image: mongo:8.3.4
     networks:
       - default
     env_file:
