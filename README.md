@@ -234,7 +234,7 @@ cd ../portainer
 docker-compose up -d
 ```
 
-### 5. Access the services
+### 6. Access the services
 
 - Grafana: <https://grafana.your-domain.com>
 - Prometheus: <https://prometheus.your-domain.com>

@@ -46,7 +46,7 @@ docker stack rm infrastructure
 
 ### Using stackctl.sh (recommended)
 
-The repo includes a helper script at the root, `./stackctl.sh`, which wraps the common lifecycle with preflight checks and nicer ergonomics.
+The repo includes a helper script at the root, `./stackctl.sh`, which wraps the common lifecycle with preflight checks and nicer ergonomics. For encrypted secrets, use `./stackctl.sh secrets deploy` to decrypt, render, deploy, and clean up in one step (see [Managing Secrets](../docs/Managing%20Secrets.md)).
 
 Prerequisites:
 - Docker Engine with Swarm enabled (single-node is fine)
@@ -80,7 +80,7 @@ Quick start:
 
 Notes:
 - `stackctl.sh` finds stack files from either `stacks/*.yml` or the repo root (`infrastructure.yml`, etc.).
-- The `doctor` command validates Compose syntax for each stack and reminds you to create `.env` files where a `.env.example` exists.
+- The `doctor` command validates Compose syntax for each stack and reminds you to create `.env` files where a `.env.example` exists. For encrypted secrets, use `./stackctl.sh secrets deploy` instead.
 - If you use local HTTPS, make sure `traefik/certs/local-cert.pem` and `traefik/certs/local-key.pem` exist; see below for generation.
 
 ### Rendered output naming
@@ -95,7 +95,7 @@ These files are ignored by Git and safe to regenerate at any time.
 
 ## Notes
 
-- Ensure each service folder has a `.env` copied from its `.env.example` where applicable.
+- Ensure each service folder has a `.env` available. For local development, copy from `.env.example`; for production, use `./stackctl.sh secrets deploy` (see [Managing Secrets](../docs/Managing%20Secrets.md)).
 - APISIX dashboard uses `apisix/api-dashboard/config/conf.yaml` (generated from `conf.example.yml`).
 - Consider adding healthchecks for critical dependencies to improve startup reliability.
 
