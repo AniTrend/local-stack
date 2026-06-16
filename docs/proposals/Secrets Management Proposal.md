@@ -25,9 +25,9 @@ Cons:
 
 Concrete steps:
 1) Keep only placeholders in `.env.example`. Do not commit real `.env`.
-2) Store real values in encrypted files under `secrets/` (SOPS + age). See `docs/secrets.md`.
+2) Store real values in encrypted `.env.enc` files per service directory (SOPS + age). See `docs/Managing Secrets.md`.
 3) At deploy time, decrypt just-in-time and create Docker secrets, e.g.:
-   - `sops -d secrets/postgres.dev.env | grep POSTGRES_PASSWORD= | cut -d= -f2 | docker secret create postgres_password -`
+   - `sops -d postgres/.env.enc | grep POSTGRES_PASSWORD= | cut -d= -f2 | docker secret create postgres_password -`
 4) Reference secrets in stacks:
 ```yaml
 services:
@@ -63,7 +63,7 @@ Cons:
 Concrete steps:
 1) Generate Portainer API key (Settings → API Keys).
 2) Write a small script to:
-   - `sops -d secrets/<svc>.env |` extract values → POST to `/api/endpoints/{id}/docker/secrets/create`.
+   - `sops -d <service>/.env.enc |` extract values → POST to `/api/endpoints/{id}/docker/secrets/create`.
    - Trigger stack redeploy via Portainer Stack API (optional) or `docker stack deploy` locally.
 3) Reference secrets in stacks as in Option A.
 
@@ -86,10 +86,10 @@ Cons:
 
 ## Recommended plan (Option A)
 
-Phase 1: Foundation
-- Keep `.env.example` placeholders. Done.
-- Add `docs/secrets.md` and `.sops.yaml`. Done.
-- Create age key(s) and commit encrypted files under `secrets/` (team recipients in `.sops.yaml`).
+Phase 1: Foundation ✅
+- Keep `.env.example` placeholders. ✅ Done.
+- Add `.sops.yaml` and `docs/Managing Secrets.md`. ✅ Done — now uses service-local `.env.enc` pattern with `stackctl.sh secrets`.
+- Create age key(s) and commit encrypted files per service directory (team recipients in `.sops.yaml`). ✅ Done — see `stackctl.sh secrets encrypt`.
 
 Phase 2: Convert priority services
 - Databases: switch to `*_FILE` and define `secrets:` in `stacks/infrastructure.yml`.
@@ -110,13 +110,13 @@ Phase 4: (Optional) Portainer integration
 ## Open questions
 - Which services require secrets and support `*_FILE`? (Postgres yes; Redis no; Mongo users might need env vars or runtime files.)
 - Who holds the age private key for CI/CD? (One or more maintainers; store on deployment hosts only.)
-- Rotation cadence? (Document per-service rotation procedure in `docs/secrets.md`.)
+- Rotation cadence? (Document per-service rotation procedure in `docs/Managing Secrets.md`.)
 
 ## Appendix: Example secret extraction
 Extract a single key from an encrypted env file without writing plaintext to disk:
 ```bash
 # Create postgres password secret from an encrypted env file
-sops -d secrets/postgres.dev.env \
+sops -d postgres/.env.enc \
   | awk -F= '/^POSTGRES_PASSWORD=/{print $2}' \
   | docker secret create postgres_password -
 ```

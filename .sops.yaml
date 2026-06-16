@@ -1,7 +1,9 @@
-# SOPS configuration for encrypting secrets committed to the repo
+# SOPS configuration for encrypting service-local .env files
+# Each service directory (e.g., postgres/, traefik/) stores an encrypted .env.enc
+# alongside its .env.example. Decrypt with: stackctl.sh secrets decrypt [service]
 creation_rules:
-  - path_regex: secrets/.*\.(env|yaml|yml)$
-    # Replace with your age public key(s)
-    age:
-      - "age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" # Replace with your real age public key
+  - path_regex: \.env(\.enc)?$
+    key_groups:
+      - age:
+          - age12ph7sgtptrrcxzxdue28j3lesnu9gj73ae9ewuvg66awp6jpae8smyvspx
     encrypted_regex: '^(?!#)'

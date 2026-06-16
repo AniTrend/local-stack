@@ -1,68 +1,142 @@
 # Managing Secrets Securely
 
-Never store real secrets in `.env` files in the repo. Keep `.env.example` as documentation with placeholders only.
+Secrets are encrypted at rest in git using SOPS + age and decrypted just-in-time at deploy time. Each service directory stores an encrypted `.env.enc` alongside its `.env.example`.
 
-## Recommended approach (encrypted files committed to git)
+## Workflow Overview
 
-Use `sops` + age (or GPG) to encrypt per-environment secrets that can be safely committed.
+```
+.env.example  →  .env (fill values)  →  .env.enc (encrypt)  →  git commit
+                                                          ↓
+.git (encrypted)  →  .env.enc  →  .env (decrypt)  →  deploy  →  shred .env
+```
 
-### 1) Install tools
-- age: https://age-encryption.org
-- sops: https://github.com/getsops/sops
+## Setup
 
-### 2) Create an age key pair (once)
+### 1. Install tools
+
 ```bash
-# writes to ~/.config/sops/age/keys.txt
+# macOS
+brew install sops age
+
+# Linux
+# sops: https://github.com/getsops/sops/releases
+# age: https://github.com/FiloSottile/age/releases
+```
+
+### 2. Generate an age key pair (once per machine)
+
+```bash
+mkdir -p ~/.config/sops/age
 age-keygen -o ~/.config/sops/age/keys.txt
+# The public key is printed — add it to .sops.yaml key_groups
 ```
-Add the public recipient from that file (starts with `age1...`) to your repository SOPS config.
 
-### 3) Add a SOPS config
-Create `.sops.yaml` at repo root:
+### 3. Add your public key to `.sops.yaml`
+
+Edit `.sops.yaml` and add your age public key to the `key_groups` list. Multiple recipients can be listed for team access:
+
 ```yaml
-# Encrypt files matching these globs with the recipient below
 creation_rules:
-  - path_regex: secrets/.*\.(env|yaml|yml)$
-    age: ["AGE1_PUBLIC_KEY_HERE"]
-    encrypted_regex: '^(?!#)'
+  - path_regex: \.env(\.enc)?$
+    key_groups:
+      - age:
+          - age1existingkey...   # existing recipient
+          - age1yournewkey...    # your new key
 ```
-Replace `AGE1_PUBLIC_KEY_HERE` with your public age key.
 
-### 4) Create encrypted secret files
-Place per-environment secrets under `secrets/` and encrypt with sops:
+## Encrypting secrets
+
+For a single service:
+
 ```bash
-mkdir -p secrets
-printf "TRAEFIK_ENABLE=true\nSSO_CREDENTIALS=admin:$apr1$...\n" > secrets/traefik.dev.env
-sops -e -i secrets/traefik.dev.env
-```
-The file is now encrypted at rest and safe to commit.
+# Create .env from .env.example and fill in real values
+cp postgres/.env.example postgres/.env
+# Edit postgres/.env with real values...
 
-### 5) Decrypt for local use
+# Encrypt
+./stackctl.sh secrets encrypt postgres
+```
+
+For all services at once:
+
 ```bash
-# Produces a plaintext file for docker usage (do not commit this)
-sops -d secrets/traefik.dev.env > traefik/.env
+./stackctl.sh secrets encrypt
 ```
-You can add a simple make/script target to automate decrypt -> deploy -> clean.
 
-### 6) CI/CD or remote deploy
-On a deployment host, provision the age private key (read-only, secured). Decrypt secrets just-in-time before `docker stack deploy`.
+This runs `sops --encrypt --input-type dotenv --output-type dotenv .env > .env.enc` for each service directory that has a `.env` file.
 
-## Using Docker Swarm secrets (optional/advanced)
-Docker Swarm supports native secrets. You can combine sops+age with `docker secret create`:
+## Deploying
 
-1) Decrypt locally in memory and pipe to secret create:
+Deploy decrypts, renders, deploys, and shreds in one step:
+
 ```bash
-sops -d secrets/traefik.dev.env | docker secret create traefik_env -
-```
-2) Reference the secret in your stack file using `secrets:` and `env_file` alternatives where appropriate.
+# Deploy a specific service's stack
+./stackctl.sh secrets deploy postgres
 
-This is more granular and keeps values out of env vars in the container filesystem, but requires adjusting service configs to read from files or environment sourced from secrets.
+# Deploy all services
+./stackctl.sh secrets deploy
+```
+
+The deploy operation:
+1. Decrypts `.env.enc` → `.env` for each target service
+2. Regenerates rendered stack files (variable substitution)
+3. Deploys the relevant Docker Swarm stacks
+4. Shreds all plaintext `.env` files
+
+## Decrypting (manual)
+
+If you need to inspect or edit secrets without deploying:
+
+```bash
+# Decrypt a single service
+./stackctl.sh secrets decrypt postgres
+
+# Decrypt all services
+./stackctl.sh secrets decrypt
+```
+
+**Remember to clean up plaintext files after editing:**
+
+```bash
+./stackctl.sh secrets clean
+```
+
+## Cleaning up
+
+Remove all plaintext `.env` files that have a corresponding `.env.enc`:
+
+```bash
+./stackctl.sh secrets clean
+```
+
+This uses `shred -u` when available, falling back to `rm -f` on systems without `shred`.
+
+## Key rotation
+
+After adding a new recipient to `.sops.yaml`:
+
+```bash
+find . -name '.env.enc' -exec sops updatekeys --yes {} \;
+```
+
+## Re-encrypting after editing
+
+```bash
+# Decrypt, edit, re-encrypt
+./stackctl.sh secrets decrypt postgres
+# Edit postgres/.env...
+./stackctl.sh secrets encrypt postgres
+./stackctl.sh secrets clean
+```
 
 ## Git hygiene
-- Commit only `.env.example` files and encrypted files under `secrets/`.
-- Never commit plaintext `.env`.
-- Add a `.gitignore` rule for `**/.env` and `**/*.env.decrypted` as needed.
+
+- **Commit**: `.env.example` (placeholders) and `.env.enc` (encrypted secrets)
+- **Never commit**: `.env` (plaintext, gitignored)
+- The `.gitignore` rule `!*.env.enc` ensures encrypted files are tracked
 
 ## Troubleshooting
-- If `sops` can’t decrypt: ensure the age private key is in `~/.config/sops/age/keys.txt`.
-- For team usage: include multiple recipients in `.sops.yaml` so each developer can decrypt.
+
+- **`sops` can't decrypt**: Ensure the age private key is at `~/.config/sops/age/keys.txt` and the corresponding public key is in `.sops.yaml`.
+- **`shred` not found**: The script falls back to `rm -f`. Install `shred` (part of `coreutils` on Linux) for secure deletion.
+- **`sops` or `age` not found**: Run `./stackctl.sh doctor` to check prerequisites, or install them manually.

@@ -1,5 +1,6 @@
 .env
 .env.bak*
+!*.env.enc
 data
 htpasswd
 *.log
