@@ -892,8 +892,12 @@ cmd_secrets() {
 			log "  deploy   [service] Decrypt, render, deploy, then shred .env"
 			log "  clean              Shred all plaintext .env files that have .env.enc"
 			log ""
-			log "If [service] is omitted, operates on all services with .env.enc."
-			log "Requires: sops and age on PATH."
+			log "Services are discovered from .env.example files in the repo."
+			log "[service] accepts a directory basename (e.g., postgres) or"
+			log "a repo-relative path (e.g., apisix/api-gateway)."
+			log "If omitted, operates on all discovered services."
+			log ""
+			log "Requires: sops and age on PATH (for encrypt, decrypt, deploy)."
 			exit 0
 			;;
 		*)
@@ -903,10 +907,6 @@ cmd_secrets() {
 			exit 2
 			;;
 	esac
-
-	# Prerequisite checks
-	check_command sops
-	check_command age
 
 	# Discover service directories that have .env.example (reuse existing discovery)
 	local -a all_dirs=()
@@ -920,6 +920,7 @@ cmd_secrets() {
 	fi
 
 	# If a service name is given, filter to that directory
+	# Accepts basename (e.g., postgres) or repo-relative path (e.g., apisix/api-gateway)
 	local -a target_dirs=()
 	if [[ $# -gt 0 ]]; then
 		local svc="$1"
@@ -927,14 +928,26 @@ cmd_secrets() {
 		for dir in "${all_dirs[@]}"; do
 			local dirname
 			dirname="$(basename "$dir")"
-			if [[ "$dirname" == "$svc" ]]; then
+			local rel_path="${dir#$SCRIPT_DIR/}"
+			if [[ "$dirname" == "$svc" || "$rel_path" == "$svc" ]]; then
 				target_dirs=("$dir")
 				found=true
 				break
 			fi
 		done
 		if [[ "$found" = false ]]; then
-			err "Service '$svc' not found. Available: $(printf '%s ' "$(for d in "${all_dirs[@]}"; do basename "$d"; done)")"
+			# Build a concise list: show basename, and rel-path when it differs
+			local available
+			available="$(for d in "${all_dirs[@]}"; do
+				local bn="$(basename "$d")"
+				local rp="${d#$SCRIPT_DIR/}"
+				if [[ "$bn" == "$rp" ]]; then
+					printf '%s ' "$bn"
+				else
+					printf '%s(%s) ' "$bn" "$rp"
+				fi
+			done)"
+			err "Service '$svc' not found. Available: $available"
 			exit 2
 		fi
 	else
@@ -943,12 +956,18 @@ cmd_secrets() {
 
 	case "$OPERATION" in
 		encrypt)
+			check_command sops
+			check_command age
 			_secrets_encrypt "${target_dirs[@]}"
 			;;
 		decrypt)
+			check_command sops
+			check_command age
 			_secrets_decrypt "${target_dirs[@]}"
 			;;
 		deploy)
+			check_command sops
+			check_command age
 			_secrets_deploy "${target_dirs[@]}"
 			;;
 		clean)
@@ -973,10 +992,14 @@ _secrets_encrypt() {
 		fi
 
 		log "Encrypting: $env_file → $enc_file"
-		if sops --encrypt --input-type dotenv --output-type dotenv "$env_file" > "$enc_file"; then
+		local tmp_enc
+		tmp_enc="$(mktemp "${enc_file}.tmp.XXXXXXXXXX")"
+		if sops --encrypt --input-type dotenv --output-type dotenv "$env_file" > "$tmp_enc"; then
+			mv "$tmp_enc" "$enc_file"
 			encrypted=$((encrypted+1))
 		else
 			err "Failed to encrypt $env_file"
+			rm -f "$tmp_enc"
 			continue
 		fi
 	done
@@ -1000,11 +1023,21 @@ _secrets_decrypt() {
 		fi
 
 		log "Decrypting: $enc_file → $env_file"
-		if sops --decrypt --input-type dotenv --output-type dotenv "$enc_file" > "$env_file"; then
-			decrypted=$((decrypted+1))
+		local tmp_env
+		tmp_env="$(mktemp "${env_file}.tmp.XXXXXXXXXX")"
+		local decrypt_ok=false
+		# Write to temp file with umask 077, then atomic move into place
+		if ( umask 077; sops --decrypt --input-type dotenv --output-type dotenv "$enc_file" > "$tmp_env" ); then
+			mv "$tmp_env" "$env_file"
+			decrypt_ok=true
 		else
 			err "Failed to decrypt $enc_file"
-			continue
+			rm -f "$tmp_env"
+		fi
+		if [[ "$decrypt_ok" = true ]]; then
+			decrypted=$((decrypted+1))
+		else
+			skipped=$((skipped+1))
 		fi
 	done
 
@@ -1017,29 +1050,30 @@ _secrets_deploy() {
 	local skipped=0
 
 	# Determine which stacks to deploy based on service dirs
-	# Map service dir name → stack name
+	# Map repo-relative path → stack name
 	local -A dir_to_stack=()
 	for dir in "${dirs[@]}"; do
-		local dirname
-		dirname="$(basename "$dir")"
-		# Find which stack file(s) reference this service
+		local rel_path="${dir#$SCRIPT_DIR/}"
+		# Match precise env_file reference in stack content: ./REL_PATH/.env
+		# Avoids false positives from loose basename-only grep matches
 		local found_stack=false
 		for stack in "${STACK_FILES[@]}"; do
 			local stack_file
 			if stack_file="$(find_stack_file "$stack")"; then
-				if grep -q "$dirname" "$stack_file" 2>/dev/null; then
-					dir_to_stack["$dirname"]="$stack"
+				if grep -F "./${rel_path}/.env" "$stack_file" >/dev/null 2>&1; then
+					dir_to_stack["$rel_path"]="$stack"
 					found_stack=true
 					break
 				fi
 			fi
 		done
 		if [[ "$found_stack" = false ]]; then
-			log "NOTE: $dirname not found in any stack file — will decrypt but not deploy"
+			log "NOTE: $rel_path not found in any stack file — will decrypt but not deploy"
 		fi
 	done
 
-	# Decrypt all target services first
+	# Decrypt all target services first (temp file + umask 077 + atomic move)
+	local -a decrypted_dirs=()
 	for dir in "${dirs[@]}"; do
 		local enc_file="$dir/.env.enc"
 		local env_file="$dir/.env"
@@ -1051,22 +1085,27 @@ _secrets_deploy() {
 		fi
 
 		log "Decrypting: $enc_file → $env_file"
-		if ! sops --decrypt --input-type dotenv --output-type dotenv "$enc_file" > "$env_file"; then
+		local tmp_env
+		tmp_env="$(mktemp "${env_file}.tmp.XXXXXXXXXX")"
+		local decrypt_ok=false
+		if ( umask 077; sops --decrypt --input-type dotenv --output-type dotenv "$enc_file" > "$tmp_env" ); then
+			mv "$tmp_env" "$env_file"
+			decrypt_ok=true
+			decrypted_dirs+=("$dir")
+		else
 			err "Failed to decrypt $enc_file — skipping deploy for this service"
+			rm -f "$tmp_env"
 			skipped=$((skipped+1))
-			continue
 		fi
 	done
 
 	# Deploy the relevant stacks
 	local -a stacks_to_deploy=()
-	local -a deployed_dirs=()
 
 	for dir in "${dirs[@]}"; do
-		local dirname
-		dirname="$(basename "$dir")"
-		if [[ -n "${dir_to_stack[$dirname]:-}" ]]; then
-			local stack="${dir_to_stack[$dirname]}"
+		local rel_path="${dir#$SCRIPT_DIR/}"
+		if [[ -n "${dir_to_stack[$rel_path]:-}" ]]; then
+			local stack="${dir_to_stack[$rel_path]}"
 			# Deduplicate stacks
 			local already=false
 			for s in "${stacks_to_deploy[@]}"; do
@@ -1075,7 +1114,6 @@ _secrets_deploy() {
 			if [[ "$already" = false ]]; then
 				stacks_to_deploy+=("$stack")
 			fi
-			deployed_dirs+=("$dir")
 		fi
 	done
 
@@ -1102,19 +1140,21 @@ _secrets_deploy() {
 		log "No stacks to deploy (services not found in any stack file)"
 	fi
 
-	# Shred all decrypted .env files
-	log "Cleaning up plaintext .env files..."
-	for dir in "${dirs[@]}"; do
-		local env_file="$dir/.env"
-		if [[ -f "$env_file" ]]; then
-			if command -v shred >/dev/null 2>&1; then
-				shred -u "$env_file"
-			else
-				rm -f "$env_file"
-				log "Warning: shred not available, used rm -f for $env_file"
+	# Shred only .env files that were successfully decrypted in this run
+	if [[ ${#decrypted_dirs[@]} -gt 0 ]]; then
+		log "Cleaning up plaintext .env files..."
+		for dir in "${decrypted_dirs[@]}"; do
+			local env_file="$dir/.env"
+			if [[ -f "$env_file" ]]; then
+				if command -v shred >/dev/null 2>&1; then
+					shred -u "$env_file"
+				else
+					rm -f "$env_file"
+					log "Warning: shred not available, used rm -f for $env_file"
+				fi
 			fi
-		fi
-	done
+		done
+	fi
 
 	log "Deploy complete: $deployed stack(s) deployed, $skipped skipped"
 }

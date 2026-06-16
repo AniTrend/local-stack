@@ -37,7 +37,7 @@ Edit `.sops.yaml` and add your age public key to the `key_groups` list. Multiple
 
 ```yaml
 creation_rules:
-  - path_regex: \.env$
+  - path_regex: \.env(\.enc)?$
     key_groups:
       - age:
           - age1existingkey...   # existing recipient
@@ -116,7 +116,7 @@ This uses `shred -u` when available, falling back to `rm -f` on systems without 
 After adding a new recipient to `.sops.yaml`:
 
 ```bash
-sops updatekeys --yes **/.env.enc
+find . -name '.env.enc' -exec sops updatekeys --yes {} \;
 ```
 
 ## Re-encrypting after editing

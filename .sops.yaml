@@ -2,7 +2,7 @@
 # Each service directory (e.g., postgres/, traefik/) stores an encrypted .env.enc
 # alongside its .env.example. Decrypt with: stackctl.sh secrets decrypt [service]
 creation_rules:
-  - path_regex: \.env$
+  - path_regex: \.env(\.enc)?$
     key_groups:
       - age:
           - age12ph7sgtptrrcxzxdue28j3lesnu9gj73ae9ewuvg66awp6jpae8smyvspx
