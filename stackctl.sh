@@ -19,6 +19,7 @@ Commands:
 	logs		Follow logs for key services or specified services
 	doctor		Run preflight checks and optional fixes
 	env		List or recreate .env files from .env.example (safe-guarded)
+	secrets		Encrypt, decrypt, deploy, or clean .env.enc files
 	generate	(Re-)generate stacks/ from compose file sources
 	sync		Check if stacks/ matches compose sources; exits 1 on drift
 	help		Show this help message and exit
@@ -873,10 +874,278 @@ cmd_doctor() {
 	fi
 }
 
+cmd_secrets() {
+	local OPERATION="${1:-}"
+	shift || true
+
+	case "$OPERATION" in
+		encrypt|decrypt|deploy|clean)
+			;;
+		-h|--help)
+			log "Manage encrypted .env.enc files with SOPS + age."
+			log ""
+			log "Usage: $SCRIPT_NAME secrets <operation> [service]"
+			log ""
+			log "Operations:"
+			log "  encrypt [service]  Encrypt .env → .env.enc for one or all services"
+			log "  decrypt [service]  Decrypt .env.enc → .env for one or all services"
+			log "  deploy   [service] Decrypt, render, deploy, then shred .env"
+			log "  clean              Shred all plaintext .env files that have .env.enc"
+			log ""
+			log "If [service] is omitted, operates on all services with .env.enc."
+			log "Requires: sops and age on PATH."
+			exit 0
+			;;
+		*)
+			err "Unknown secrets operation: ${OPERATION:-<none>}"
+			log "Usage: $SCRIPT_NAME secrets <encrypt|decrypt|deploy|clean> [service]"
+			log "Run: $SCRIPT_NAME secrets --help"
+			exit 2
+			;;
+	esac
+
+	# Prerequisite checks
+	check_command sops
+	check_command age
+
+	# Discover service directories that have .env.example (reuse existing discovery)
+	local -a all_dirs=()
+	while IFS= read -r dir; do
+		[[ -z "$dir" ]] || all_dirs+=("$dir")
+	done < <(discover_env_example_dirs)
+
+	if [[ ${#all_dirs[@]} -eq 0 ]]; then
+		log "No service directories found (no .env.example files)."
+		exit 0
+	fi
+
+	# If a service name is given, filter to that directory
+	local -a target_dirs=()
+	if [[ $# -gt 0 ]]; then
+		local svc="$1"
+		local found=false
+		for dir in "${all_dirs[@]}"; do
+			local dirname
+			dirname="$(basename "$dir")"
+			if [[ "$dirname" == "$svc" ]]; then
+				target_dirs=("$dir")
+				found=true
+				break
+			fi
+		done
+		if [[ "$found" = false ]]; then
+			err "Service '$svc' not found. Available: $(printf '%s ' "$(for d in "${all_dirs[@]}"; do basename "$d"; done)")"
+			exit 2
+		fi
+	else
+		target_dirs=("${all_dirs[@]}")
+	fi
+
+	case "$OPERATION" in
+		encrypt)
+			_secrets_encrypt "${target_dirs[@]}"
+			;;
+		decrypt)
+			_secrets_decrypt "${target_dirs[@]}"
+			;;
+		deploy)
+			_secrets_deploy "${target_dirs[@]}"
+			;;
+		clean)
+			_secrets_clean "${all_dirs[@]}"
+			;;
+	esac
+}
+
+_secrets_encrypt() {
+	local -a dirs=("$@")
+	local encrypted=0
+	local skipped=0
+
+	for dir in "${dirs[@]}"; do
+		local env_file="$dir/.env"
+		local enc_file="$dir/.env.enc"
+
+		if [[ ! -f "$env_file" ]]; then
+			log "SKIP: $dir — no .env file to encrypt"
+			skipped=$((skipped+1))
+			continue
+		fi
+
+		log "Encrypting: $env_file → $enc_file"
+		if sops --encrypt --input-type dotenv --output-type dotenv "$env_file" > "$enc_file"; then
+			encrypted=$((encrypted+1))
+		else
+			err "Failed to encrypt $env_file"
+			continue
+		fi
+	done
+
+	log "Encrypt complete: $encrypted encrypted, $skipped skipped"
+}
+
+_secrets_decrypt() {
+	local -a dirs=("$@")
+	local decrypted=0
+	local skipped=0
+
+	for dir in "${dirs[@]}"; do
+		local enc_file="$dir/.env.enc"
+		local env_file="$dir/.env"
+
+		if [[ ! -f "$enc_file" ]]; then
+			log "SKIP: $dir — no .env.enc file to decrypt"
+			skipped=$((skipped+1))
+			continue
+		fi
+
+		log "Decrypting: $enc_file → $env_file"
+		if sops --decrypt --input-type dotenv --output-type dotenv "$enc_file" > "$env_file"; then
+			decrypted=$((decrypted+1))
+		else
+			err "Failed to decrypt $enc_file"
+			continue
+		fi
+	done
+
+	log "Decrypt complete: $decrypted decrypted, $skipped skipped"
+}
+
+_secrets_deploy() {
+	local -a dirs=("$@")
+	local deployed=0
+	local skipped=0
+
+	# Determine which stacks to deploy based on service dirs
+	# Map service dir name → stack name
+	local -A dir_to_stack=()
+	for dir in "${dirs[@]}"; do
+		local dirname
+		dirname="$(basename "$dir")"
+		# Find which stack file(s) reference this service
+		local found_stack=false
+		for stack in "${STACK_FILES[@]}"; do
+			local stack_file
+			if stack_file="$(find_stack_file "$stack")"; then
+				if grep -q "$dirname" "$stack_file" 2>/dev/null; then
+					dir_to_stack["$dirname"]="$stack"
+					found_stack=true
+					break
+				fi
+			fi
+		done
+		if [[ "$found_stack" = false ]]; then
+			log "NOTE: $dirname not found in any stack file — will decrypt but not deploy"
+		fi
+	done
+
+	# Decrypt all target services first
+	for dir in "${dirs[@]}"; do
+		local enc_file="$dir/.env.enc"
+		local env_file="$dir/.env"
+
+		if [[ ! -f "$enc_file" ]]; then
+			log "SKIP: $dir — no .env.enc file"
+			skipped=$((skipped+1))
+			continue
+		fi
+
+		log "Decrypting: $enc_file → $env_file"
+		if ! sops --decrypt --input-type dotenv --output-type dotenv "$enc_file" > "$env_file"; then
+			err "Failed to decrypt $enc_file — skipping deploy for this service"
+			skipped=$((skipped+1))
+			continue
+		fi
+	done
+
+	# Deploy the relevant stacks
+	local -a stacks_to_deploy=()
+	local -a deployed_dirs=()
+
+	for dir in "${dirs[@]}"; do
+		local dirname
+		dirname="$(basename "$dir")"
+		if [[ -n "${dir_to_stack[$dirname]:-}" ]]; then
+			local stack="${dir_to_stack[$dirname]}"
+			# Deduplicate stacks
+			local already=false
+			for s in "${stacks_to_deploy[@]}"; do
+				[[ "$s" == "$stack" ]] && already=true
+			done
+			if [[ "$already" = false ]]; then
+				stacks_to_deploy+=("$stack")
+			fi
+			deployed_dirs+=("$dir")
+		fi
+	done
+
+	if [[ ${#stacks_to_deploy[@]} -gt 0 ]]; then
+		# Regenerate stacks if needed (reuse up logic)
+		if command -v python3 >/dev/null 2>&1; then
+			log "Regenerating stacks before deploy..."
+			python3 "$SCRIPT_DIR/tools/generate_stacks.py" 2>/dev/null || log "Warning: stack generation failed"
+		fi
+
+		for stack in "${stacks_to_deploy[@]}"; do
+			local file
+			if file="$(find_stack_file "$stack")"; then
+				local render_file
+				render_file="$(render_stack_file "$file")"
+				log "Deploying stack: $stack"
+				docker stack deploy -c "$render_file" "$stack"
+				deployed=$((deployed+1))
+			else
+				err "Stack file not found for '$stack'"
+			fi
+		done
+	else
+		log "No stacks to deploy (services not found in any stack file)"
+	fi
+
+	# Shred all decrypted .env files
+	log "Cleaning up plaintext .env files..."
+	for dir in "${dirs[@]}"; do
+		local env_file="$dir/.env"
+		if [[ -f "$env_file" ]]; then
+			if command -v shred >/dev/null 2>&1; then
+				shred -u "$env_file"
+			else
+				rm -f "$env_file"
+				log "Warning: shred not available, used rm -f for $env_file"
+			fi
+		fi
+	done
+
+	log "Deploy complete: $deployed stack(s) deployed, $skipped skipped"
+}
+
+_secrets_clean() {
+	local -a dirs=("$@")
+	local cleaned=0
+
+	for dir in "${dirs[@]}"; do
+		local env_file="$dir/.env"
+		local enc_file="$dir/.env.enc"
+
+		if [[ -f "$env_file" && -f "$enc_file" ]]; then
+			log "Shredding: $env_file"
+			if command -v shred >/dev/null 2>&1; then
+				shred -u "$env_file"
+			else
+				rm -f "$env_file"
+				log "Warning: shred not available, used rm -f for $env_file"
+			fi
+			cleaned=$((cleaned+1))
+		fi
+	done
+
+	log "Clean complete: $cleaned plaintext .env file(s) removed"
+}
+
 # Determine subcommand (default: up)
 SUBCOMMAND="${1:-}"
 case "$SUBCOMMAND" in
-	up|down|status|logs|doctor|env|generate|sync|help|-h|--help)
+	up|down|status|logs|doctor|env|secrets|generate|sync|help|-h|--help)
 		[[ $# -gt 0 ]] && shift || true ;;
 	*)
 		SUBCOMMAND="up" ;;
@@ -899,6 +1168,8 @@ case "$SUBCOMMAND" in
 		cmd_sync "$@" ;;
 	doctor)
 		cmd_doctor "$@" ;;
+	secrets)
+		cmd_secrets "$@" ;;
 	help|-h|--help)
 		print_usage ;;
 	*)
