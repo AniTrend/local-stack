@@ -86,10 +86,10 @@ Cons:
 
 ## Recommended plan (Option A)
 
-Phase 1: Foundation
-- Keep `.env.example` placeholders. Done.
-- Add `docs/secrets.md` and `.sops.yaml`. Done.
-- Create age key(s) and commit encrypted files under `secrets/` (team recipients in `.sops.yaml`).
+Phase 1: Foundation ✅
+- Keep `.env.example` placeholders. ✅ Done.
+- Add `.sops.yaml` and `docs/Managing Secrets.md`. ✅ Done — now uses service-local `.env.enc` pattern with `stackctl.sh secrets`.
+- Create age key(s) and commit encrypted files per service directory (team recipients in `.sops.yaml`). ✅ Done — see `stackctl.sh secrets encrypt`.
 
 Phase 2: Convert priority services
 - Databases: switch to `*_FILE` and define `secrets:` in `stacks/infrastructure.yml`.
