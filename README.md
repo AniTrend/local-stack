@@ -261,10 +261,20 @@ local-stack/
 
 ## Configuration
 
-Each component has its own environment file for configuration. Copy the example files and modify as needed:
+Each component has its own environment file for configuration. For local development without secrets management:
 
 ```sh
 find . -name ".env.example" -exec sh -c 'cp "$1" "${1%.example}"' _ {} \;
+```
+
+For production or shared environments, use the SOPS + age secrets workflow (see [Managing Secrets](docs/Managing%20Secrets.md)):
+
+```sh
+# Decrypt and deploy in one step
+./stackctl.sh secrets deploy
+
+# Or decrypt manually for inspection
+./stackctl.sh secrets decrypt
 ```
 
 ## License
