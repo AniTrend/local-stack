@@ -42,7 +42,7 @@ services:
           memory: 384M
           cpus: '0.50'
   edge-graphql:
-    image: ghcr.io/anitrend/edge-graphql:0.1.8
+    image: ghcr.io/anitrend/edge-graphql:0.1.9
     networks:
       - default
     env_file: ./edge-graphql/.env
