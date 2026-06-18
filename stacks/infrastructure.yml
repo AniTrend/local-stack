@@ -54,7 +54,7 @@ services:
         limits:
           memory: 256M
   apisix_gateway:
-    image: apache/apisix:3.16.0-debian
+    image: apache/apisix:3.17.0-debian
     networks:
       - default
     env_file:
