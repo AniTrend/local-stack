@@ -110,6 +110,8 @@ services:
       - default
     env_file:
       - ./mongo/.env
+    environment:
+      - GLIBC_TUNABLES=glibc.pthread.rseq=1
     volumes:
       - mongo-data:/data
       - mongo-data:/data/db
