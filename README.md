@@ -195,11 +195,13 @@ secrets workflow, rendered output, and troubleshooting.
 
 ### 3. Set up individual services (Compose - for local iterative work)
 
-Per-service Compose remains available for development iteration. Copy the
-`.env.example` for each service first:
+Per-service Compose remains available for development iteration. Use the
+repo's safe env helper to create `.env` files from examples (skips existing
+files; use `--force` to overwrite with backup):
 
 ```bash
-find . -name ".env.example" -exec sh -c 'test -e "$1" && cp "$1" "${1%.example}"' _ {} \;
+./stackctl.sh env --list          # see which .env files exist or are missing
+./stackctl.sh env --recreate      # create missing .env files from .env.example
 ```
 
 Then start a service in its directory (e.g., `cd traefik && docker compose up -d`).
@@ -231,10 +233,11 @@ local-stack/
 
 ## Configuration
 
-Each component has its own environment file for configuration. For local development without secrets management:
+Each component has its own environment file for configuration. For local development without secrets management, use the safe env helper:
 
 ```sh
-find . -name ".env.example" -exec sh -c 'cp "$1" "${1%.example}"' _ {} \;
+./stackctl.sh env --list        # see which .env files exist or are missing
+./stackctl.sh env --recreate    # create missing .env files from .env.example
 ```
 
 For production or shared environments, use the SOPS + age secrets workflow (see [Managing Secrets](docs/Managing%20Secrets.md)):
