@@ -5,7 +5,7 @@ A local development environment for the AniTrend stack, providing a complete inf
 > Swarm migration: This repository has migrated from multiple per-service Docker Compose files to modular Docker Swarm stacks located under `stacks/`.
 > Prefer the Swarm workflow for full environment deploys; per-service Compose remains for local iterative work.
 >
-> Quick start (Swarm): see `stacks/README.md` for the runbook (init swarm, create `traefik-public`, deploy `infrastructure`, `observability`, `platform`).
+> Quick start (Swarm): run `./stackctl.sh doctor --fix-network && ./stackctl.sh up`.  See `stacks/README.md` for the full runbook.
 
 ## Stack Components
 
@@ -182,59 +182,29 @@ git clone https://github.com/your-org/local-stack.git
 cd local-stack
 ```
 
-### 2. Deploy via Swarm (recommended)
-
-See `stacks/README.md` for the full runbook or use `stackctl.sh` helpers:
+### 2. Deploy via Swarm (canonical)
 
 ```bash
+# Single-command deploy with preflight checks, rendering, and log following
 ./stackctl.sh doctor --fix-network
 ./stackctl.sh up
 ```
 
-### 3. Set up core infrastructure (Compose - legacy local-only)
+See `stacks/README.md` for the complete runbook, stack selection, encrypted
+secrets workflow, rendered output, and troubleshooting.
+
+### 3. Set up individual services (Compose - for local iterative work)
+
+Per-service Compose remains available for development iteration. Copy the
+`.env.example` for each service first:
 
 ```bash
-# Start Traefik first
-cd traefik
-cp .env.example .env
-docker-compose up -d
-
-# Start databases
-cd ../postgres && docker-compose up -d
-cd ../mongo && docker-compose up -d
-cd ../redis && docker-compose up -d
+find . -name ".env.example" -exec sh -c 'test -e "$1" && cp "$1" "${1%.example}"' _ {} \;
 ```
 
-### 4. Set up the observability stack (Compose - legacy local-only)
+Then start a service in its directory (e.g., `cd traefik && docker compose up -d`).
 
-```bash
-cd ../observability
-for dir in grafana prometheus loki tempo otel; do
-  cp $dir/.env.example $dir/.env
-done
-docker-compose up -d
-```
-
-### 5. Set up additional services (Compose - legacy local-only)
-
-```bash
-# API Gateway
-cd ../apisix
-cp .env.example .env
-docker-compose up -d
-
-# Feature flags
-cd ../growthbook
-cp dashboard/.env.example dashboard/.env
-cp proxy/.env.example proxy/.env
-docker-compose -f docker.compose.yml up -d
-
-# Container management
-cd ../portainer
-docker-compose up -d
-```
-
-### 6. Access the services
+### 4. Access the services
 
 - Grafana: <https://grafana.your-domain.com>
 - Prometheus: <https://prometheus.your-domain.com>
