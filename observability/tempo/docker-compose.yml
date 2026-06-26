@@ -1,15 +1,11 @@
-<<<<<<< Updated upstream
 ---
 x-stack: observability
-=======
->>>>>>> Stashed changes
 volumes:
   tempo-data:
     name: tempo-data
     driver: local
 
 services:
-<<<<<<< Updated upstream
 
   memcached:
     container_name: memcached
@@ -36,15 +32,6 @@ services:
     environment:
       - TEMPO_GID=10001
       - TEMPO_UID=10001
-=======
-  tempo:
-    container_name: tempo
-    image: grafana/tempo:2.7.1
-    command: ["-config.file=/etc/tempo/config.yaml"]
-    volumes:
-      - ./tempo.yaml:/etc/tempo/config.yaml
-      - tempo-data:/tmp/tempo
->>>>>>> Stashed changes
     env_file: .env
     networks:
       - default
@@ -52,13 +39,9 @@ services:
     logging:
       options:
         max-size: "10m"
-<<<<<<< Updated upstream
         max-file: 3
     depends_on:
       - memcached
-=======
-        max-file: "3"
->>>>>>> Stashed changes
 
 networks:
   default:
