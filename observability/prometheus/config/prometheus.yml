@@ -33,19 +33,19 @@ scrape_configs:
     static_configs:
       - targets: ['loki:3100']
 
-  # Traefik metrics
+  # Traefik metrics (cross-stack: Traefik in infrastructure, Prometheus in observability)
   - job_name: traefik
     metrics_path: /metrics
     scrape_interval: 30s
     static_configs:
-      - targets: ['traefik:8080']
+      - targets: ['infrastructure_traefik:8080']
 
-  # APISIX metrics
+  # APISIX metrics (cross-stack: APISIX in infrastructure, Prometheus in observability)
   - job_name: "apisix"
     scrape_interval: 30s
     metrics_path: /apisix/prometheus/metrics
     static_configs:
-      - targets: ['apisix-gateway:9091']
+      - targets: ['infrastructure_apisix_gateway:9091']
 
   # Add exemplar support for Tempo trace linking
   - job_name: 'traces'
