@@ -1044,33 +1044,27 @@ _secrets_decrypt() {
 	log "Decrypt complete: $decrypted decrypted, $skipped skipped"
 }
 
+# Resolve which stack owns a service directory by grepping its .env reference
+# in committed stack files.  Uses linear scan (3 stacks × ~10 dirs) to stay
+# POSIX-safe; avoids Bash 4+ associative arrays that break on macOS.
+_dir_to_stack() {
+	local rel_path="$1"
+	for stack in "${STACK_FILES[@]}"; do
+		local stack_file
+		if stack_file="$(find_stack_file "$stack")"; then
+			if grep -F "./${rel_path}/.env" "$stack_file" >/dev/null 2>&1; then
+				printf '%s' "$stack"
+				return 0
+			fi
+		fi
+	done
+	return 1
+}
+
 _secrets_deploy() {
 	local -a dirs=("$@")
 	local deployed=0
 	local skipped=0
-
-	# Determine which stacks to deploy based on service dirs
-	# Map repo-relative path → stack name
-	local -A dir_to_stack=()
-	for dir in "${dirs[@]}"; do
-		local rel_path="${dir#$SCRIPT_DIR/}"
-		# Match precise env_file reference in stack content: ./REL_PATH/.env
-		# Avoids false positives from loose basename-only grep matches
-		local found_stack=false
-		for stack in "${STACK_FILES[@]}"; do
-			local stack_file
-			if stack_file="$(find_stack_file "$stack")"; then
-				if grep -F "./${rel_path}/.env" "$stack_file" >/dev/null 2>&1; then
-					dir_to_stack["$rel_path"]="$stack"
-					found_stack=true
-					break
-				fi
-			fi
-		done
-		if [[ "$found_stack" = false ]]; then
-			log "NOTE: $rel_path not found in any stack file — will decrypt but not deploy"
-		fi
-	done
 
 	# Decrypt all target services first (temp file + umask 077 + atomic move)
 	local -a decrypted_dirs=()
@@ -1099,14 +1093,13 @@ _secrets_deploy() {
 		fi
 	done
 
-	# Deploy the relevant stacks
+	# Determine which stacks to deploy (deduped, one lookup per dir)
 	local -a stacks_to_deploy=()
-
 	for dir in "${dirs[@]}"; do
 		local rel_path="${dir#$SCRIPT_DIR/}"
-		if [[ -n "${dir_to_stack[$rel_path]:-}" ]]; then
-			local stack="${dir_to_stack[$rel_path]}"
-			# Deduplicate stacks
+		local stack
+		if stack="$(_dir_to_stack "$rel_path")"; then
+			# Deduplicate — same stack may be referenced by multiple services
 			local already=false
 			for s in "${stacks_to_deploy[@]}"; do
 				[[ "$s" == "$stack" ]] && already=true
@@ -1114,6 +1107,8 @@ _secrets_deploy() {
 			if [[ "$already" = false ]]; then
 				stacks_to_deploy+=("$stack")
 			fi
+		else
+			log "NOTE: $rel_path not found in any stack file — will decrypt but not deploy"
 		fi
 	done
 
@@ -1121,7 +1116,7 @@ _secrets_deploy() {
 		# Regenerate stacks if needed (reuse up logic)
 		if command -v python3 >/dev/null 2>&1; then
 			log "Regenerating stacks before deploy..."
-			python3 "$SCRIPT_DIR/tools/generate_stacks.py" 2>/dev/null || log "Warning: stack generation failed"
+			python3 "$SCRIPT_DIR/tools/generate_stacks.py" || log "Warning: stack generation failed"
 		fi
 
 		for stack in "${stacks_to_deploy[@]}"; do
