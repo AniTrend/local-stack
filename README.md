@@ -81,6 +81,7 @@ The observability stack provides full monitoring capabilities through metrics, l
     - Loki
     - Traefik
     - APISIX Gateway
+  - Traefik and APISIX are cross-stack targets resolved via Swarm's `<stack>_<service>` DNS naming on the shared overlay network.
 
 #### Logs
 

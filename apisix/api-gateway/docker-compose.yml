@@ -19,6 +19,17 @@ services:
       - ./config/apisix.yaml:/usr/local/apisix/conf/config.yaml:ro
       - cache:/tmp/apisix-cache/
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://localhost:9091/apisix/prometheus/metrics
+      interval: 20s
+      timeout: 5s
+      retries: 3
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
       - "traefik.http.routers.apisix.rule=Host(`${HOST}`)"
