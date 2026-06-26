@@ -19,34 +19,16 @@
 - All exposed services must attach to `traefik-public` and define Traefik labels for routing.
 - Persist critical data via named volumes. Mark volumes as `external: true` to reuse existing data.
 
-## Runbook (single-node)
+## Runbook
 
-```bash
-# 1) Initialize Swarm (idempotent)
-docker swarm init
+### Using stackctl.sh (primary)
 
-# 2) Create shared overlay network (idempotent)
-docker network create --driver=overlay --attachable traefik-public
-
-# 3) Deploy stacks (names are identifiers)
-docker stack deploy -c stacks/infrastructure.yml infrastructure
-docker stack deploy -c stacks/observability.yml observability
-docker stack deploy -c stacks/platform.yml platform
-
-# 4) Verify
-docker stack services infrastructure
-docker stack services observability
-docker stack services platform
-
-# 5) Teardown (keeps volumes)
-docker stack rm platform
-docker stack rm observability
-docker stack rm infrastructure
-```
-
-### Using stackctl.sh (recommended)
-
-The repo includes a helper script at the root, `./stackctl.sh`, which wraps the common lifecycle with preflight checks and nicer ergonomics. For encrypted secrets, use `./stackctl.sh secrets deploy` to decrypt, render, deploy, and clean up in one step (see [Managing Secrets](../docs/Managing%20Secrets.md)).
+`./stackctl.sh` is the canonical deployment path. It handles preflight checks, stack
+regeneration, variable rendering, and deployment in one workflow. Committed
+`stacks/*.yml` files intentionally contain `${VAR}` placeholders that must be
+resolved before Swarm can use them. `stackctl.sh` calls `tools/render_compose.py`
+to substitute service-local `env_file` values into a gitignored `.rendered/`
+copy, then deploys the rendered file.
 
 Prerequisites:
 - Docker Engine with Swarm enabled (single-node is fine)
@@ -56,13 +38,13 @@ Prerequisites:
 Quick start:
 
 ```bash
-# Validate your environment (safe to run repeatedly). Add --fix-network to auto-create the overlay network.
+# 1) Validate your environment (safe to run repeatedly). Add --fix-network to auto-create the overlay network.
 ./stackctl.sh doctor --fix-network
 
-# Optionally ensure external named volumes exist before deploying
+# 2) Optionally ensure external named volumes exist before deploying
 ./stackctl.sh doctor --fix-volumes
 
-# Deploy all stacks and follow key logs (Traefik, Prometheus, Loki)
+# 3) Deploy all stacks and follow key logs (Traefik, Prometheus, Loki)
 ./stackctl.sh up
 
 # Or deploy a subset
@@ -76,22 +58,72 @@ Quick start:
 
 # Remove stacks (keeps volumes); add --remove-network to also remove traefik-public
 ./stackctl.sh down -y
+
+# For encrypted secrets, decrypt, render, deploy, and clean up in one step:
+./stackctl.sh secrets deploy
 ```
 
 Notes:
-- `stackctl.sh` finds stack files from either `stacks/*.yml` or the repo root (`infrastructure.yml`, etc.).
-- The `doctor` command validates Compose syntax for each stack and reminds you to create `.env` files where a `.env.example` exists. For encrypted secrets, use `./stackctl.sh secrets deploy` instead.
+- `stackctl.sh` finds stack files from `stacks/*.yml`. The rendered output is written to `.rendered/` (gitignored); committed source stacks are never modified.
+- The `doctor` command validates Compose syntax for each stack and reminds you to create `.env` files where a `.env.example` exists. For encrypted secrets, use `./stackctl.sh secrets deploy` instead (see [Managing Secrets](../docs/Managing%20Secrets.md)).
 - If you use local HTTPS, make sure `traefik/certs/local-cert.pem` and `traefik/certs/local-key.pem` exist; see below for generation.
+- To check for drift between compose sources and committed stacks: `./stackctl.sh sync`
 
-### Rendered output naming
+### Raw docker stack deploy (alternative, advanced)
 
-When deploying, `stackctl.sh` pre-renders variables into a copy of the stack file and writes it to `.rendered/` with a docker-compose.* prefix:
+> **These commands deploy unresolved `${VAR}` placeholders.** Committed `stacks/*.yml`
+> are not directly deployable without pre-rendering or equivalent shell environment
+> setup. Docker Swarm does not load `env_file` for Compose variable interpolation --
+> that is a Compose CLI feature only.
 
-- `stacks/infrastructure.yml` -> `.rendered/docker-compose.infrastructure.rendered.yml`
-- `stacks/observability.yml` -> `.rendered/docker-compose.observability.rendered.yml`
-- `stacks/platform.yml` -> `.rendered/docker-compose.platform.rendered.yml`
+If you must deploy manually, ensure all variables are resolved first (e.g., via
+`tools/render_compose.py` or `envsubst`). For debugging or inspection:
 
-These files are ignored by Git and safe to regenerate at any time.
+```bash
+# 1) Initialize Swarm (idempotent)
+docker swarm init
+
+# 2) Create shared overlay network (idempotent)
+docker network create --driver=overlay --attachable traefik-public
+
+# 3) Generate stacks from compose sources
+./stackctl.sh generate
+
+# 4) Render variables into .rendered/ files
+#    (handled automatically by stackctl.sh up; shown here for manual inspection)
+python3 tools/render_compose.py -i stacks/infrastructure.yml -o .rendered/infrastructure.rendered.yml --repo-root .
+
+# 5) Deploy the rendered file (not the source stack)
+docker stack deploy -c .rendered/infrastructure.rendered.yml infrastructure
+
+# 6) Verify
+docker stack services infrastructure
+docker stack services observability
+docker stack services platform
+
+# 7) Teardown (keeps volumes)
+docker stack rm platform
+docker stack rm observability
+docker stack rm infrastructure
+```
+
+### Rendered output
+
+`stackctl.sh` pre-renders variables into gitignored `.rendered/` copies before
+deployment.  Naming follows `${stack_name}.rendered.yml`:
+
+- `stacks/infrastructure.yml` → `.rendered/infrastructure.rendered.yml`
+- `stacks/observability.yml` → `.rendered/observability.rendered.yml`
+- `stacks/platform.yml` → `.rendered/platform.rendered.yml`
+
+These files are ignored by Git and safe to regenerate at any time. Inspect without
+committing:
+
+```bash
+./stackctl.sh up --dry-run  # validates and logs render paths
+# or render manually:
+python3 tools/render_compose.py -i stacks/infrastructure.yml -o /tmp/check.rendered.yml --repo-root .
+```
 
 ## Notes
 
