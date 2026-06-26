@@ -129,7 +129,7 @@ python3 tools/render_compose.py -i stacks/infrastructure.yml -o /tmp/check.rende
 
 - Ensure each service folder has a `.env` available. For local development, copy from `.env.example`; for production, use `./stackctl.sh secrets deploy` (see [Managing Secrets](../docs/Managing%20Secrets.md)).
 - APISIX dashboard uses `apisix/api-dashboard/config/conf.yaml` (generated from `conf.example.yml`).
-- Consider adding healthchecks for critical dependencies to improve startup reliability.
+- Healthchecks have been added for Prometheus and APISIX. Consider adding them for other services as needed.
 
 ### Resource caps & logging
 
