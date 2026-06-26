@@ -441,13 +441,17 @@ cmd_generate() {
 
 cmd_sync() {
 	local QUIET=false
+	TARGET_STACKS=("${STACK_FILES[@]}")
 
 	while [[ $# -gt 0 ]]; do
 		case "${1:-}" in
 			-q|--quiet)
 				QUIET=true; shift ;;
+			-s|--stacks)
+				[[ $# -lt 2 ]] && { err "--stacks requires a value"; exit 2; }
+				set_target_stacks "${2:-}"; shift 2 ;;
 			-h|--help)
-				log "Check if stacks/ is in sync with compose sources. Exits 1 on drift."; exit 0 ;;
+				log "Check if stacks/ is in sync with compose sources. Exits 1 on drift. Options: -q/--quiet, -s/--stacks <list>"; exit 0 ;;
 			--)
 				shift; break ;;
 			-*)
@@ -462,19 +466,25 @@ cmd_sync() {
 		exit 2
 	fi
 
-	local tmp_dir
+	local tmp_dir gen_err
 	tmp_dir="$(mktemp -d)"
-	trap "rm -rf '$tmp_dir'" EXIT
+	gen_err="$(mktemp)"
+	trap "rm -rf '$tmp_dir' '$gen_err'" EXIT
 
 	[[ "$QUIET" = false ]] && log "Checking stack drift (generating to temp dir)..."
-	python3 "$SCRIPT_DIR/tools/generate_stacks.py" --output-dir "$tmp_dir" 2>/dev/null || true
+	if ! python3 "$SCRIPT_DIR/tools/generate_stacks.py" --output-dir "$tmp_dir" 2>"$gen_err"; then
+		[[ "$QUIET" = false ]] && cat "$gen_err" >&2
+		err "Stack generation failed; cannot verify sync state."
+		exit 1
+	fi
 
 	local drift=false
-	for stack in "${STACK_FILES[@]}"; do
+	for stack in "${TARGET_STACKS[@]}"; do
 		local generated="$tmp_dir/${stack}.yml"
 		local current="$STACKS_DIR/${stack}.yml"
 		if [[ ! -f "$generated" ]]; then
-			log "Warning: generator produced no output for: $stack"
+			log "DRIFT: generator produced no output for $stack"
+			drift=true
 			continue
 		fi
 		if [[ ! -f "$current" ]]; then
@@ -495,7 +505,7 @@ cmd_sync() {
 		fi
 	done
 
-	rm -rf "$tmp_dir"
+	rm -rf "$tmp_dir" "$gen_err"
 	trap - EXIT
 
 	if [[ "$drift" = true ]]; then
@@ -1121,7 +1131,7 @@ _secrets_deploy() {
 		# Regenerate stacks if needed (reuse up logic)
 		if command -v python3 >/dev/null 2>&1; then
 			log "Regenerating stacks before deploy..."
-			python3 "$SCRIPT_DIR/tools/generate_stacks.py" 2>/dev/null || log "Warning: stack generation failed"
+			python3 "$SCRIPT_DIR/tools/generate_stacks.py" || log "Warning: stack generation failed"
 		fi
 
 		for stack in "${stacks_to_deploy[@]}"; do
