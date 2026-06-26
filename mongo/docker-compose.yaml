@@ -15,10 +15,12 @@ services:
       - .env
     environment:
       - GLIBC_TUNABLES=glibc.pthread.rseq=1
-    # Single /data mount covers MongoDB's default dbPath (/data/db) and
-    # config DB path (/data/configdb) which are subdirectories of /data.
+    # Mount exact paths matching the official Mongo image Dockerfile VOLUME
+    # declarations (/data/db, /data/configdb).  A parent /data mount would
+    # leave Docker-managed anonymous child volumes for the declared paths.
     volumes:
-      - mongo-data:/data
+      - mongo-data:/data/db
+      - mongo-data:/data/configdb
     restart: unless-stopped
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
