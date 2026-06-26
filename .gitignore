@@ -12,3 +12,6 @@ htpasswd
 __pycache__/
 # Added by code-review-graph
 .code-review-graph/
+
+# Deepwork session tracking
+.slim/deepwork/
