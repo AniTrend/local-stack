@@ -1,14 +1,25 @@
+<<<<<<< Updated upstream
 ---
 x-stack: observability
+=======
+>>>>>>> Stashed changes
 volumes:
   loki-data:
     name: loki-data
     driver: local
+<<<<<<< Updated upstream
     # external: true
 services:
   loki:
     container_name: loki
     image: grafana/loki:3.7.3
+=======
+
+services:
+  loki:
+    container_name: loki
+    image: grafana/loki:3.4.2
+>>>>>>> Stashed changes
     command: -config.file=/etc/loki/config.yaml
     volumes:
       - ./config.yaml:/etc/loki/config.yaml
@@ -20,7 +31,11 @@ services:
     logging:
       options:
         max-size: "10m"
+<<<<<<< Updated upstream
         max-file: 3
+=======
+        max-file: "3"
+>>>>>>> Stashed changes
 
 networks:
   default:
