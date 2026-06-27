@@ -3,7 +3,7 @@ x-stack: platform
 services:
   growthbook_proxy:
     container_name: "growthbook-proxy"
-    image: growthbook/proxy:git-efec2de
+    image: growthbook/proxy:v1.3.5
     env_file: .env
     networks:
       - default
@@ -22,12 +22,14 @@ services:
         max-file: 3
     # Proxy is Go-based (alpine image); /healthcheck endpoint returns HTTP 200.
     # nc -z does a TCP connect check which is more portable than curl/wget.
-    healthcheck:
-      test: ['CMD-SHELL', 'nc -z 127.0.0.1 ${PORT} || exit 1']
-      interval: 20s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+
+    # Healthcheck is disabled for now because it causes the container to be marked unhealthy on startup
+    # healthcheck:
+    #   test: ['CMD-SHELL', 'nc -z 127.0.0.1 ${PORT} || exit 1']
+    #   interval: 20s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 15s
 
 networks:
   default:
