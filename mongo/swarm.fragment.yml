@@ -1,5 +1,9 @@
 services:
   mongo:
+    networks:
+      default:
+        aliases:
+          - mongo
     deploy:
       resources:
         reservations:

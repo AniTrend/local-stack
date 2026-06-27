@@ -1,5 +1,9 @@
 services:
   grafana:
+    networks:
+      default:
+        aliases:
+          - grafana
     deploy:
       mode: replicated
       replicas: 1

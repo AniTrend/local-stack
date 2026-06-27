@@ -1,5 +1,9 @@
 services:
   postgres:
+    networks:
+      default:
+        aliases:
+          - postgres
     deploy:
       resources:
         reservations:

@@ -1,5 +1,9 @@
 services:
   loki:
+    networks:
+      default:
+        aliases:
+          - loki
     deploy:
       mode: replicated
       replicas: 1

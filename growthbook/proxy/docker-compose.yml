@@ -6,9 +6,7 @@ services:
     image: growthbook/proxy:git-efec2de
     env_file: .env
     networks:
-      default:
-        aliases:
-          - growthbook-proxy
+      - default
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
       - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'

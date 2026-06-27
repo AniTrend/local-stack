@@ -1,5 +1,9 @@
 services:
   apisix_gateway:
+    networks:
+      default:
+        aliases:
+          - apisix-gateway
     deploy:
       mode: global
       placement:

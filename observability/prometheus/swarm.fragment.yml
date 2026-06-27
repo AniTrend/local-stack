@@ -1,5 +1,9 @@
 services:
   prometheus:
+    networks:
+      default:
+        aliases:
+          - prometheus
     deploy:
       mode: replicated
       replicas: 1

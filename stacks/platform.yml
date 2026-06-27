@@ -11,7 +11,9 @@ services:
   edge-graphql:
     image: ghcr.io/anitrend/edge-graphql:0.1.9
     networks:
-      - default
+      default:
+        aliases:
+          - edge-graphql
     env_file: ./edge-graphql/.env
     labels:
       - traefik.enable=${TRAEFIK_ENABLE}
@@ -63,7 +65,9 @@ services:
       - traefik.http.routers.growth-api.tls=true
       - traefik.http.routers.growth-api.tls.certresolver=${CERT_RESOLVER}
     networks:
-      - default
+      default:
+        aliases:
+          - growthbook
     logging:
       options:
         max-size: 10m
@@ -124,7 +128,9 @@ services:
   anitrend-edge:
     image: ghcr.io/anitrend/on-the-edge:1.5.4
     networks:
-      - default
+      default:
+        aliases:
+          - anitrend-edge
     env_file: ./on-the-edge/.env
     labels:
       - traefik.enable=${TRAEFIK_ENABLE}
@@ -154,7 +160,9 @@ services:
   website:
     image: ghcr.io/anitrend/website:0.4.2
     networks:
-      - default
+      default:
+        aliases:
+          - website
     env_file: ./website/.env
     labels:
       - traefik.enable=${TRAEFIK_ENABLE}

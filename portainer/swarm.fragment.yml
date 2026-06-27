@@ -1,5 +1,9 @@
 services:
   portainer:
+    networks:
+      default:
+        aliases:
+          - portainer
     deploy:
       mode: global
       placement:

@@ -1,5 +1,9 @@
 services:
   otel-collector:
+    networks:
+      default:
+        aliases:
+          - otel-collector
     deploy:
       mode: replicated
       replicas: 1

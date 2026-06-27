@@ -22,7 +22,7 @@ Local-Stack is a local infrastructure repo moving from service-local Compose fil
 ## Core Pattern
 
 1. Find the owning source folder first.
-2. Edit service-local sources such as `docker-compose.yml`, `docker-compose.yaml`, `swarm.fragment.yml`, and `.env.example`.
+2. Edit service-local sources: `docker-compose.yml` for Compose concerns (image, volumes, labels); `swarm.fragment.yml` for Swarm-only config (`deploy`, network aliases, DNS overrides); `.env.example` for new variables.
 3. Treat files under `stacks/` as rendered output unless the workflow explicitly says to regenerate or sync them.
 4. Keep exposed services on the shared `traefik-public` network with Traefik labels.
 5. Keep secrets out of source and prefer environment variables or documented secret management.

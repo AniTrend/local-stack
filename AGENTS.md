@@ -12,6 +12,7 @@ Local-Stack is migrating from per-service Compose to modular Docker Swarm stacks
 
 - For full-environment deploys and validation, follow [stacks/README.md](stacks/README.md) and the `./stackctl.sh` workflow.
 - For service-local changes, update the service folder's `docker-compose.yml`, `swarm.fragment.yml`, and `.env.example` together when needed.
+- **Swarm customizations go in `swarm.fragment.yml`:** `deploy` (mode, replicas, placement, resources), network aliases, DNS overrides, and any key that only applies under `docker stack deploy`. Keep `docker-compose.yml` portable — it should work standalone with `docker compose up` where possible.
 - Keep exposed services attached to the shared `traefik-public` network and route them with Traefik labels and [traefik/config/dynamic.yml](traefik/config/dynamic.yml).
 - Update Grafana provisioning under [observability/grafana/config/provisioning/](observability/grafana/config/provisioning/) when dashboards or datasources change.
 

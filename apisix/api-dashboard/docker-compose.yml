@@ -2,13 +2,10 @@
 x-stack: infrastructure
 services:
   apisix_dashboard:
-    container_name: "apisix-dashobard"
+    container_name: "apisix-dashboard"
     image: apache/apisix-dashboard:3.0.1-alpine
     networks:
-      default:
-        aliases:
-          - apisix-dashobard
-          - apisix-dashboard
+      - default
     env_file:
       - .env
     volumes:

@@ -28,7 +28,6 @@ services:
     networks:
       default:
         aliases:
-          - apisix-dashobard
           - apisix-dashboard
     env_file:
       - ./apisix/api-dashboard/.env
@@ -121,7 +120,9 @@ services:
   mongo:
     image: mongo:8.3.4
     networks:
-      - default
+      default:
+        aliases:
+          - mongo
     env_file:
       - ./mongo/.env
     environment:
@@ -163,7 +164,9 @@ services:
       - traefik.http.routers.portainer.tls=true
       - traefik.http.routers.portainer.tls.certresolver=${CERT_RESOLVER}
     networks:
-      - default
+      default:
+        aliases:
+          - portainer
     logging:
       options:
         max-size: 10m
@@ -185,7 +188,9 @@ services:
   postgres:
     image: postgres:17
     networks:
-      - default
+      default:
+        aliases:
+          - postgres
     volumes:
       - data:/var/lib/postgresql
     env_file: ./postgres/.env
@@ -210,7 +215,9 @@ services:
   redis:
     image: redis:8.8-alpine
     networks:
-      - default
+      default:
+        aliases:
+          - redis
     command: redis-server --appendonly yes
     env_file: ./redis/.env
     labels:
@@ -234,7 +241,9 @@ services:
   traefik:
     image: traefik:v3.7
     networks:
-      - default
+      default:
+        aliases:
+          - traefik
     ports:
       - 80:80
       - 443:443

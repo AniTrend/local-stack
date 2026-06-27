@@ -1,5 +1,9 @@
 services:
   growthbook_proxy:
+    networks:
+      default:
+        aliases:
+          - growthbook-proxy
     deploy:
       mode: replicated
       replicas: 1

@@ -1,5 +1,9 @@
 services:
   edge-graphql:
+    networks:
+      default:
+        aliases:
+          - edge-graphql
     deploy:
       mode: replicated
       replicas: 1
@@ -13,3 +17,4 @@ services:
         limits:
           memory: 384M
           cpus: '0.50'
+

@@ -13,6 +13,7 @@
 
 ## Conventions
 
+- **Separation of concerns:** `docker-compose.yml` carries Compose-only concerns (`container_name`, `restart`, `build`, image, volumes, ports, labels). Swarm-specific customizations — `deploy` scheduling, network aliases, DNS overrides, and any key that only makes sense under `docker stack deploy` — belong in the sibling `swarm.fragment.yml`. Do not put Swarm config in `docker-compose.yml`.
 - Shared overlay network: `traefik-public` (external, attachable). Create once per swarm host.
 - No Compose-only keys: do not use `container_name`, `restart`, or `build` in stacks.
 - Use `deploy` for scheduling (mode, placement, resources) and `env_file` for configuration.

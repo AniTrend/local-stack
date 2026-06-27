@@ -1,5 +1,9 @@
 services:
   apisix_dashboard:
+    networks:
+      default:
+        aliases:
+          - apisix-dashboard
     deploy:
       mode: global
       placement:
