@@ -24,6 +24,12 @@ services:
       - "traefik.tcp.routers.postgres.tls=true"
       - "traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
     logging:
       options:

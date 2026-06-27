@@ -30,6 +30,12 @@ services:
       - "traefik.tcp.routers.mongo.tls=true"
       - "traefik.tcp.routers.mongo.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}"
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.runCommand({ping:1}).ok ? quit(0) : quit(1)\""]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 networks:
   default:

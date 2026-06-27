@@ -20,12 +20,14 @@ services:
       options:
         max-size: "10m"
         max-file: 3
-    # healthcheck:
-    #   test: ['CMD', 'curl', '-f', 'http://localhost:${PORT}/healthcheck']
-    #   interval: 20s
-    #   timeout: 5s
-    #   retries: 3
-    #   start_period: 10s
+    # Proxy is Go-based (alpine image); /healthcheck endpoint returns HTTP 200.
+    # nc -z does a TCP connect check which is more portable than curl/wget.
+    healthcheck:
+      test: ['CMD-SHELL', 'nc -z 127.0.0.1 ${PORT} || exit 1']
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 networks:
   default:

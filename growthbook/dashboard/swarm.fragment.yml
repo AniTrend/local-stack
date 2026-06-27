@@ -17,4 +17,9 @@ services:
         limits:
           memory: 800M
           cpus: '0.80'
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 180s
 

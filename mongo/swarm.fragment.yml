@@ -10,3 +10,8 @@ services:
           memory: 256M
         limits:
           memory: 800M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s

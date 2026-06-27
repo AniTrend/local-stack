@@ -45,6 +45,17 @@ services:
       options:
         max-size: 10m
         max-file: 3
+    healthcheck:
+      test:
+        - CMD
+        - nc
+        - -z
+        - 127.0.0.1
+        - '9000'
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     deploy:
       mode: global
       placement:
@@ -55,6 +66,11 @@ services:
           memory: 64M
         limits:
           memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 180s
   apisix_gateway:
     image: apache/apisix:3.17.0-debian
     networks:
@@ -97,6 +113,11 @@ services:
         limits:
           memory: 384M
           cpus: '0.40'
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 180s
   etcd:
     image: bitnamilegacy/etcd:3.6.4
     networks:
@@ -111,12 +132,25 @@ services:
       options:
         max-size: 10m
         max-file: 3
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - etcdctl endpoint health 2>/dev/null || curl -sf http://localhost:2379/health
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         reservations:
           memory: 64M
         limits:
           memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
   mongo:
     image: mongo:8.3.4
     networks:
@@ -138,12 +172,25 @@ services:
       - traefik.tcp.routers.mongo.tls=true
       - traefik.tcp.routers.mongo.tls.certresolver=${CERT_RESOLVER}
       - traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mongosh --quiet --eval "db.runCommand({ping:1}).ok ? quit(0) : quit(1)"'
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     deploy:
       resources:
         reservations:
           memory: 256M
         limits:
           memory: 800M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
     logging:
       driver: local
       options:
@@ -202,6 +249,14 @@ services:
       - traefik.tcp.routers.postgres.tls=true
       - traefik.tcp.routers.postgres.tls.certresolver=${CERT_RESOLVER}
       - traefik.tcp.services.postgres.loadbalancer.server.port=${PORT}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-postgres}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     logging:
       options:
         max-size: 10m
@@ -212,6 +267,11 @@ services:
           memory: 128M
         limits:
           memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
   redis:
     image: redis:8.8-alpine
     networks:
@@ -228,6 +288,14 @@ services:
       - traefik.tcp.routers.redis.tls=true
       - traefik.tcp.routers.redis.tls.certresolver=${CERT_RESOLVER}
       - traefik.tcp.services.redis.loadbalancer.server.port=${PORT}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     logging:
       options:
         max-size: 10m
@@ -238,6 +306,11 @@ services:
           memory: 32M
         limits:
           memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
   traefik:
     image: traefik:v3.7
     networks:
