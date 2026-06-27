@@ -16,3 +16,11 @@ services:
         limits:
           memory: 384M
           cpus: '0.40'
+      # Restart on failure so the gateway recovers if etcd is not ready.
+      # APISIX has internal startup_retry (2 retries, ~60 s total).
+      # If etcd needs longer, Swarm restarts the task until etcd is healthy.
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 180s

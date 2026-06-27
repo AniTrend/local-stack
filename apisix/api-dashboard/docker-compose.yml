@@ -23,6 +23,14 @@ services:
       options:
         max-size: "10m"
         max-file: 3
+    # Image (Alpine 3.17) has BusyBox nc; no curl/wget.
+    # Dashboard exposes GET /ping on port 9000 (manager-api healthz).
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9000"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
 
 networks:
