@@ -21,12 +21,8 @@ services:
     restart: unless-stopped
     healthcheck:
       test:
-        - CMD
-        - wget
-        - --no-verbose
-        - --tries=1
-        - --spider
-        - http://localhost:9091/apisix/prometheus/metrics
+        - CMD-SHELL
+        - test -s /usr/local/apisix/logs/nginx.pid
       interval: 20s
       timeout: 5s
       retries: 3
