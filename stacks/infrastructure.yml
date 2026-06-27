@@ -29,6 +29,7 @@ services:
       default:
         aliases:
           - apisix-dashobard
+          - apisix-dashboard
     env_file:
       - ./apisix/api-dashboard/.env
     volumes:
