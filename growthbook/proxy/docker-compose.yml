@@ -20,16 +20,21 @@ services:
       options:
         max-size: "10m"
         max-file: 3
-    # Proxy is Go-based (alpine image); /healthcheck endpoint returns HTTP 200.
-    # nc -z does a TCP connect check which is more portable than curl/wget.
-
-    # Healthcheck is disabled for now because it causes the container to be marked unhealthy on startup
-    # healthcheck:
-    #   test: ['CMD-SHELL', 'nc -z 127.0.0.1 ${PORT} || exit 1']
-    #   interval: 20s
-    #   timeout: 5s
-    #   retries: 3
-    #   start_period: 15s
+    # Image is node:22-slim (Debian) — no curl/wget/nc.
+    # Uses Node.js built-in fetch against /healthcheck (returns {"ok": true}).
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e
+          "fetch('http://127.0.0.1:3300/healthcheck')
+            .then(r => r.json())
+            .then(d => process.exit(d.ok ? 0 : 1))
+            .catch(() => process.exit(1))"
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 networks:
   default:
