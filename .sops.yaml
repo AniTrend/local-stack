@@ -6,4 +6,3 @@ creation_rules:
     key_groups:
       - age:
           - age12ph7sgtptrrcxzxdue28j3lesnu9gj73ae9ewuvg66awp6jpae8smyvspx
-    encrypted_regex: '^(?!#)'
