@@ -64,7 +64,6 @@ metrics_generator:
 storage:
   trace:
     backend: local                     # backend configuration to use
-    block_retention: 48h               # overall Tempo trace retention (was under compactor pre-3.0)
     wal:
       path: /var/tempo/wal             # where to store the wal locally
     local:
