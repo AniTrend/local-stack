@@ -26,7 +26,10 @@ services:
   apisix_dashboard:
     image: apache/apisix-dashboard:3.0.1-alpine
     networks:
-      - default
+      default:
+        aliases:
+          - apisix-dashobard
+          - apisix-dashboard
     env_file:
       - ./apisix/api-dashboard/.env
     volumes:
@@ -56,7 +59,9 @@ services:
   apisix_gateway:
     image: apache/apisix:3.17.0-debian
     networks:
-      - default
+      default:
+        aliases:
+          - apisix-gateway
     env_file:
       - ./apisix/api-gateway/.env
     volumes:

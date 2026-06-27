@@ -12,7 +12,9 @@ services:
     container_name: "apisix-gateway"
     image: apache/apisix:3.17.0-debian
     networks:
-      - default
+      default:
+        aliases:
+          - apisix-gateway
     env_file:
       - .env
     volumes:
