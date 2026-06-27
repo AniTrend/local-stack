@@ -12,7 +12,9 @@ services:
     container_name: "apisix-etcd"
     image: bitnamilegacy/etcd:3.6.4
     networks:
-      - default
+      default:
+        aliases:
+          - apisix-etcd
     env_file:
       - .env
     volumes:
