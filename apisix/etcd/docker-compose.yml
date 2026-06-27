@@ -25,7 +25,9 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - etcdctl endpoint health 2>/dev/null || curl -sf http://localhost:2379/health
+        - >-
+          etcdctl endpoint health 2>/dev/null
+          || curl -sf http://localhost:2379/health
       interval: 10s
       timeout: 5s
       retries: 5
