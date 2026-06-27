@@ -1,5 +1,9 @@
 services:
   redis:
+    networks:
+      default:
+        aliases:
+          - redis
     deploy:
       resources:
         reservations:

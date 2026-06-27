@@ -1,5 +1,9 @@
 services:
   etcd:
+    networks:
+      default:
+        aliases:
+          - apisix-etcd
     deploy:
       resources:
         reservations:

@@ -1,5 +1,9 @@
 services:
   tempo:
+    networks:
+      default:
+        aliases:
+          - tempo
     deploy:
       mode: replicated
       replicas: 1
@@ -12,4 +16,9 @@ services:
         reservations:
           memory: 256M
         limits:
-          memory: 600M
+           memory: 600M
+  memcached:
+    networks:
+      default:
+        aliases:
+          - memcached

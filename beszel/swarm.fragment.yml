@@ -1,5 +1,9 @@
 services:
   beszel:
+    networks:
+      default:
+        aliases:
+          - beszel
     deploy:
       mode: replicated
       replicas: 1
@@ -12,6 +16,10 @@ services:
         limits:
           memory: 256M
   beszel-agent:
+    networks:
+      default:
+        aliases:
+          - beszel-agent
     deploy:
       mode: replicated
       replicas: 1

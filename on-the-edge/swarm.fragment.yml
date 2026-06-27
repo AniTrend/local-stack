@@ -1,5 +1,9 @@
 services:
   anitrend-edge:
+    networks:
+      default:
+        aliases:
+          - anitrend-edge
     deploy:
       mode: replicated
       replicas: 1
@@ -13,3 +17,4 @@ services:
         limits:
           memory: 384M
           cpus: '0.50'
+

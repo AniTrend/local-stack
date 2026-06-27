@@ -1,5 +1,9 @@
 services:
   traefik:
+    networks:
+      default:
+        aliases:
+          - traefik
     deploy:
       mode: global
       placement:

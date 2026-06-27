@@ -26,7 +26,9 @@ services:
   beszel:
     image: henrygd/beszel:0.18.7
     networks:
-      - default
+      default:
+        aliases:
+          - beszel
     volumes:
       - beszel-data:/beszel_data
       - beszel-socket:/beszel_socket
@@ -58,7 +60,9 @@ services:
   beszel-agent:
     image: henrygd/beszel-agent:0.18.7
     networks:
-      - default
+      default:
+        aliases:
+          - beszel-agent
     volumes:
       - beszel-socket:/beszel_socket
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -94,7 +98,9 @@ services:
       - traefik.http.routers.grafana.tls.certresolver=${CERT_RESOLVER}
       - traefik.http.services.grafana.loadbalancer.server.port=${PORT}
     networks:
-      - default
+      default:
+        aliases:
+          - grafana
     logging:
       options:
         max-size: 10m
@@ -120,7 +126,9 @@ services:
       - loki-data:/loki
     env_file: ./observability/loki/.env
     networks:
-      - default
+      default:
+        aliases:
+          - loki
     logging:
       options:
         max-size: 10m
@@ -154,7 +162,9 @@ services:
       - traefik.tcp.routers.otel.tls.certresolver=${CERT_RESOLVER}
       - traefik.tcp.services.otel.loadbalancer.server.port=${PORT}
     networks:
-      - default
+      default:
+        aliases:
+          - otel-collector
     logging:
       options:
         max-size: 10m
@@ -194,7 +204,9 @@ services:
       - traefik.http.routers.prometheus.tls.certresolver=${CERT_RESOLVER}
       - traefik.http.services.prometheus.loadbalancer.server.port=${PORT}
     networks:
-      - default
+      default:
+        aliases:
+          - prometheus
     healthcheck:
       test:
         - CMD
@@ -231,7 +243,9 @@ services:
       - MEMCACHED_MAX_MEMORY=64m
       - MEMCACHED_THREADS=2
     networks:
-      - default
+      default:
+        aliases:
+          - memcached
     logging:
       options:
         max-size: 10m
@@ -249,7 +263,9 @@ services:
       - TEMPO_UID=10001
     env_file: ./observability/tempo/.env
     networks:
-      - default
+      default:
+        aliases:
+          - tempo
     logging:
       options:
         max-size: 10m
