@@ -50,6 +50,25 @@ check_command() {
 	command -v "$1" >/dev/null 2>&1 || { err "'$1' is required but not installed or not on PATH"; exit 2; }
 }
 
+file_mtime() {
+	local path="$1"
+	local mt=""
+
+	# GNU stat on Linux uses -c '%Y'. BSD/macOS stat uses -f '%m'.
+	# GNU stat also accepts -f, but with filesystem semantics; validate the
+	# result is numeric before using it in arithmetic under set -u.
+	if mt="$(stat -c '%Y' "$path" 2>/dev/null)" && [[ "$mt" =~ ^[0-9]+$ ]]; then
+		printf '%s\n' "$mt"
+		return 0
+	fi
+	if mt="$(stat -f '%m' "$path" 2>/dev/null)" && [[ "$mt" =~ ^[0-9]+$ ]]; then
+		printf '%s\n' "$mt"
+		return 0
+	fi
+
+	printf '0\n'
+}
+
 # Render a pre-merged stack file (stacks/*.yml) through tools/render_compose.py.
 # This performs per-service ${VAR} substitution using each service's env_file(s)
 # and writes the result to .rendered/ (which is git-ignored).
@@ -544,13 +563,13 @@ cmd_up() {
 			if [[ ! -f "$STACKS_DIR/${_s}.yml" ]]; then
 				_needs_regen=true; break
 			fi
-			_mt="$(stat -f '%m' "$STACKS_DIR/${_s}.yml" 2>/dev/null || stat -c '%Y' "$STACKS_DIR/${_s}.yml" 2>/dev/null || echo 0)"
+			_mt="$(file_mtime "$STACKS_DIR/${_s}.yml")"
 			[[ "$_mt" -lt "$_oldest" ]] && _oldest="$_mt"
 		done
 		if [[ "$_needs_regen" = false ]]; then
 			while IFS= read -r _src; do
 				[[ -z "$_src" ]] && continue
-				_mt="$(stat -f '%m' "$_src" 2>/dev/null || stat -c '%Y' "$_src" 2>/dev/null || echo 0)"
+				_mt="$(file_mtime "$_src")"
 				if [[ "$_mt" -gt "$_oldest" ]]; then _needs_regen=true; break; fi
 			done < <(find "$SCRIPT_DIR" -type f \( -name 'docker-compose.yml' -o -name 'docker-compose.yaml' -o -name 'swarm.fragment.yml' \) 2>/dev/null || true)
 		fi
