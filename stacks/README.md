@@ -33,11 +33,17 @@ copy, then deploys the rendered file.
 Prerequisites:
 - Docker Engine with Swarm enabled (single-node is fine)
 - The external overlay network `traefik-public`
+- Python render dependencies installed in `tools/.venv`
 - Optional: local TLS certs in `traefik/certs/` for `*.docker.localhost`
 
 Quick start:
 
 ```bash
+# 0) Install the stack generation/render toolchain once per host
+python3 -m venv tools/.venv
+tools/.venv/bin/python -m pip install --upgrade pip
+tools/.venv/bin/python -m pip install -r tools/requirements.txt
+
 # 1) Validate your environment (safe to run repeatedly). Add --fix-network to auto-create the overlay network.
 ./stackctl.sh doctor --fix-network
 
