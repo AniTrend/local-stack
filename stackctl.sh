@@ -50,12 +50,39 @@ check_command() {
 	command -v "$1" >/dev/null 2>&1 || { err "'$1' is required but not installed or not on PATH"; exit 2; }
 }
 
-# Verify that tools/render_compose.py can run (python3 + ruamel.yaml present).
+tools_python() {
+	local venv_python="$SCRIPT_DIR/tools/.venv/bin/python"
+	if [[ -x "$venv_python" ]]; then
+		printf '%s\n' "$venv_python"
+		return 0
+	fi
+	if command -v python3 >/dev/null 2>&1; then
+		command -v python3
+		return 0
+	fi
+	return 1
+}
+
+log_render_setup_hint() {
+	log "Render toolchain setup:"
+	log "  python3 -m venv tools/.venv"
+	log "  tools/.venv/bin/python -m pip install --upgrade pip"
+	log "  tools/.venv/bin/python -m pip install -r tools/requirements.txt"
+}
+
+# Verify that tools/generate_stacks.py and tools/render_compose.py can run
+# (python3 + PyYAML + ruamel.yaml present).
 # Exits with a clear error and remediation hint when dependencies are missing.
 check_render_deps() {
-	check_command python3
-	if ! python3 -c "import ruamel.yaml" 2>/dev/null; then
-		err "ruamel.yaml is required for rendering. Install with: pip3 install -r tools/requirements.txt"
+	local py
+	if ! py="$(tools_python)"; then
+		err "python3 is required for rendering, and tools/.venv/bin/python was not found."
+		log_render_setup_hint
+		exit 2
+	fi
+	if ! "$py" -c "import yaml; import ruamel.yaml" 2>/dev/null; then
+		err "PyYAML and ruamel.yaml are required for stack generation/rendering but are not both importable by: $py"
+		log_render_setup_hint
 		exit 2
 	fi
 }
@@ -97,9 +124,10 @@ render_stack_file() {
 	local out_dir="${RENDER_DIR:-$SCRIPT_DIR/.rendered}"
 	mkdir -p "$out_dir"
 	local out_file="$out_dir/${stack_name}.rendered.yml"
+	local py=""
 
-	if command -v python3 >/dev/null 2>&1; then
-		if python3 "$SCRIPT_DIR/tools/render_compose.py" \
+	if py="$(tools_python)"; then
+		if "$py" "$SCRIPT_DIR/tools/render_compose.py" \
 				-i "$in_file" \
 				-o "$out_file" \
 				--repo-root "$SCRIPT_DIR" >/dev/null 2>&1; then
@@ -111,7 +139,8 @@ render_stack_file() {
 				printf '%s\n' "$in_file"
 				return 0
 			fi
-			err "Render failed for $in_file. Ensure ruamel.yaml is installed (pip3 install -r tools/requirements.txt) and that all service env_file paths exist. Re-run with --allow-unrendered only for debugging."
+			err "Render failed for $in_file. Ensure the tools virtualenv is installed and all service env_file paths exist. Re-run with --allow-unrendered only for debugging."
+			log_render_setup_hint
 			exit 2
 		fi
 	fi
@@ -122,6 +151,7 @@ render_stack_file() {
 		return 0
 	fi
 	err "python3 not found -- cannot render $in_file. Install python3 and re-run, or use --allow-unrendered only for debugging."
+	log_render_setup_hint
 	exit 2
 }
 
@@ -472,8 +502,10 @@ cmd_generate() {
 		esac
 	done
 
-	if ! command -v python3 >/dev/null 2>&1; then
-		err "python3 is required for 'generate'"
+	local py
+	if ! py="$(tools_python)"; then
+		err "python3 is required for 'generate', and tools/.venv/bin/python was not found."
+		log_render_setup_hint
 		exit 2
 	fi
 
@@ -482,7 +514,7 @@ cmd_generate() {
 	[[ -n "$STACKS_ARG" ]] && gen_args+=(-s "$STACKS_ARG")
 
 	log "Generating stack files from compose sources..."
-	python3 "$SCRIPT_DIR/tools/generate_stacks.py" ${gen_args[@]+"${gen_args[@]}"}
+	"$py" "$SCRIPT_DIR/tools/generate_stacks.py" ${gen_args[@]+"${gen_args[@]}"}
 }
 
 cmd_sync() {
@@ -507,8 +539,10 @@ cmd_sync() {
 		esac
 	done
 
-	if ! command -v python3 >/dev/null 2>&1; then
-		err "python3 is required for 'sync'"
+	local py
+	if ! py="$(tools_python)"; then
+		err "python3 is required for 'sync', and tools/.venv/bin/python was not found."
+		log_render_setup_hint
 		exit 2
 	fi
 
@@ -518,7 +552,7 @@ cmd_sync() {
 	trap "rm -rf '$tmp_dir' '$gen_err'" EXIT
 
 	[[ "$QUIET" = false ]] && log "Checking stack drift (generating to temp dir)..."
-	if ! python3 "$SCRIPT_DIR/tools/generate_stacks.py" --output-dir "$tmp_dir" 2>"$gen_err"; then
+	if ! "$py" "$SCRIPT_DIR/tools/generate_stacks.py" --output-dir "$tmp_dir" 2>"$gen_err"; then
 		[[ "$QUIET" = false ]] && cat "$gen_err" >&2
 		err "Stack generation failed; cannot verify sync state."
 		exit 1
@@ -601,18 +635,13 @@ cmd_up() {
 	# incorrect env_file path resolution (Docker resolves them relative to
 	# the stack file, not the repo root).
 	if [[ "$ALLOW_UNRENDERED" = false ]]; then
-		if [[ "$DRY_RUN" = false ]]; then
-			check_render_deps
-			log "Render dependencies OK (ruamel.yaml available)"
-		else
-			if ! python3 -c "import ruamel.yaml" 2>/dev/null; then
-				log "DRY-RUN: ruamel.yaml not available -- render step will be skipped in dry-run mode"
-			fi
-		fi
+		check_render_deps
+		log "Stack toolchain dependencies OK (PyYAML + ruamel.yaml available)"
 	fi
 
 	# Auto-regenerate stacks when any compose/fragment source is newer than the oldest stack file
-	if [[ "$SKIP_GENERATE" = false ]] && command -v python3 >/dev/null 2>&1; then
+	local generate_python=""
+	if [[ "$SKIP_GENERATE" = false ]] && generate_python="$(tools_python)"; then
 		local _oldest=9999999999 _needs_regen=false _mt
 		for _s in "${TARGET_STACKS[@]}"; do
 			if [[ ! -f "$STACKS_DIR/${_s}.yml" ]]; then
@@ -631,9 +660,9 @@ cmd_up() {
 		if [[ "$_needs_regen" = true ]]; then
 			log "Source files are newer than stacks/ — auto-regenerating..."
 			if [[ "$DRY_RUN" = true ]]; then
-				log "DRY-RUN: would run: python3 $SCRIPT_DIR/tools/generate_stacks.py"
+				log "DRY-RUN: would run: $generate_python $SCRIPT_DIR/tools/generate_stacks.py"
 			else
-				python3 "$SCRIPT_DIR/tools/generate_stacks.py"
+				"$generate_python" "$SCRIPT_DIR/tools/generate_stacks.py"
 			fi
 		fi
 	fi
@@ -819,14 +848,22 @@ cmd_doctor() {
 	fi
 
 	# Render toolchain
-	if command -v python3 >/dev/null 2>&1; then
-		if python3 -c "import ruamel.yaml" 2>/dev/null; then
-			log "OK: render toolchain (python3 + ruamel.yaml) available"
+	local render_python=""
+	if render_python="$(tools_python)"; then
+		log "Found render Python: $render_python"
+		if [[ "$render_python" != "$SCRIPT_DIR/tools/.venv/bin/python" ]]; then
+			log "NOTE: tools/.venv/bin/python not found; using global python3 instead."
+			log_render_setup_hint
+		fi
+		if "$render_python" -c "import yaml; import ruamel.yaml" 2>/dev/null; then
+			log "OK: stack toolchain (python + PyYAML + ruamel.yaml) available"
 		else
-			log "NOTE: python3 found but ruamel.yaml is missing. Install with: pip3 install -r tools/requirements.txt"
+			log "NOTE: PyYAML and/or ruamel.yaml missing from render Python: $render_python"
+			log_render_setup_hint
 		fi
 	else
-		log "NOTE: python3 not found -- stack rendering will not be available"
+		log "NOTE: python3 not found and tools/.venv/bin/python not found -- stack rendering will not be available"
+		log_render_setup_hint
 	fi
 
 	# Swarm state
