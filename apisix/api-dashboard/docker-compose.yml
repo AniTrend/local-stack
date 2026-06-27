@@ -5,7 +5,10 @@ services:
     container_name: "apisix-dashobard"
     image: apache/apisix-dashboard:3.0.1-alpine
     networks:
-      - default
+      default:
+        aliases:
+          - apisix-dashobard
+          - apisix-dashboard
     env_file:
       - .env
     volumes:
