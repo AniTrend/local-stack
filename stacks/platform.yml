@@ -8,39 +8,6 @@ networks:
     name: traefik-public
     external: true
 services:
-  django-server:
-    image: ghcr.io/anitrend/anitrend:0.8.0
-    command:
-      - /usr/src/start.sh
-    networks:
-      - default
-    env_file: ./anitrend/.env
-    labels:
-      - traefik.enable=${TRAEFIK_ENABLE}
-      - traefik.http.routers.anitrend-graphql.rule=Host(`${HOST}`)
-      - traefik.http.routers.anitrend-graphql.entrypoints=web,websecure
-      - traefik.http.routers.anitrend-graphql.service=anitrend-graphql
-      - traefik.http.routers.anitrend-graphql.tls=true
-      - traefik.http.routers.anitrend-graphql.tls.certresolver=${CERT_RESOLVER}
-      - traefik.http.services.anitrend-graphql.loadbalancer.server.port=${PORT}
-    logging:
-      driver: local
-      options:
-        max-size: 2m
-        max-file: 3
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      resources:
-        reservations:
-          memory: 128M
-          cpus: '0.10'
-        limits:
-          memory: 384M
-          cpus: '0.50'
   edge-graphql:
     image: ghcr.io/anitrend/edge-graphql:0.1.9
     networks:
