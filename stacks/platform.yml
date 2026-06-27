@@ -71,8 +71,9 @@ services:
     healthcheck:
       test:
         - CMD
-        - wget
-        - http://localhost:${API_PORT}
+        - node
+        - -e
+        - require("http").get("http://127.0.0.1:${API_PORT}",r=>process.exit(r.statusCode===200?0:1)).on("error",()=>process.exit(1))
       interval: 20s
       timeout: 5s
       retries: 3
