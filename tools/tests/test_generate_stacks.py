@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from pathlib import Path
 import sys
 import textwrap
 from typing import Any, Dict
 
 import pytest
+import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -233,3 +235,121 @@ def test_generate_stack_injects_logging(tmp_path: Path):
     svc = result["services"]["web"]
     assert "logging" in svc
     assert svc["logging"]["driver"] == "local"
+
+
+# ---------------------------------------------------------------------------
+# 14. main — --dry-run prints valid YAML to stdout, writes no files
+# ---------------------------------------------------------------------------
+MODULE = os.path.join(os.path.dirname(__file__), "..", "generate_stacks.py")
+
+
+def test_main_dry_run(tmp_path: Path):
+    compose_file = tmp_path / "docker-compose.yml"
+    compose_file.write_text(
+        textwrap.dedent(
+            """\
+            x-stack: test
+            services:
+              web:
+                image: nginx
+            """
+        )
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            MODULE,
+            "--dry-run",
+            "--stacks",
+            "test",
+            "--repo-root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+    assert "stack: test" in result.stdout
+    assert "image: nginx" in result.stdout
+    assert not (tmp_path / "stacks").exists()
+
+
+# ---------------------------------------------------------------------------
+# 15. main --dry-run — output is structurally valid YAML
+# ---------------------------------------------------------------------------
+def test_main_dry_run_yaml_valid(tmp_path: Path):
+    compose_file = tmp_path / "docker-compose.yml"
+    compose_file.write_text(
+        textwrap.dedent(
+            """\
+            x-stack: test
+            services:
+              web:
+                image: nginx
+                volumes:
+                  - app-data:/data
+            volumes:
+              app-data:
+                driver: local
+            """
+        )
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            MODULE,
+            "--dry-run",
+            "--stacks",
+            "test",
+            "--repo-root",
+            str(tmp_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, f"stderr: {result.stderr}"
+
+    # Strip the "# --- stack: test ---" header line
+    yaml_text = result.stdout
+    lines = yaml_text.splitlines()
+    # Find the first non-comment, non-empty line as YAML start
+    yaml_lines = [line for line in lines if not line.strip().startswith("#") and line.strip()]
+    yaml_block = "\n".join(yaml_lines)
+
+    data = yaml.safe_load(yaml_block)
+    assert isinstance(data, dict)
+    assert "services" in data
+    assert "volumes" in data
+    assert "networks" in data
+    assert data["services"]["web"]["image"] == "nginx"
+
+
+# ---------------------------------------------------------------------------
+# 16. generate_stack — preserves env_file path as relative
+# ---------------------------------------------------------------------------
+def test_generate_stack_preserves_env_file_path(tmp_path: Path):
+    compose_file = tmp_path / "docker-compose.yml"
+    compose_file.write_text(
+        textwrap.dedent(
+            """\
+            x-stack: test
+            services:
+              web:
+                image: nginx
+                env_file: ./.env
+            """
+        )
+    )
+
+    result = generate_stack("test", [str(compose_file)], str(tmp_path))
+    svc = result["services"]["web"]
+    assert "env_file" in svc, "env_file key must be preserved in output service"
+    env_file = svc["env_file"]
+    assert isinstance(env_file, str)
+    assert env_file.startswith("./"), (
+        f"env_file should be a relative path starting with './', got: {env_file}"
+    )

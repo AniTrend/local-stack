@@ -50,6 +50,16 @@ check_command() {
 	command -v "$1" >/dev/null 2>&1 || { err "'$1' is required but not installed or not on PATH"; exit 2; }
 }
 
+# Verify that tools/render_compose.py can run (python3 + ruamel.yaml present).
+# Exits with a clear error and remediation hint when dependencies are missing.
+check_render_deps() {
+	check_command python3
+	if ! python3 -c "import ruamel.yaml" 2>/dev/null; then
+		err "ruamel.yaml is required for rendering. Install with: pip3 install -r tools/requirements.txt"
+		exit 2
+	fi
+}
+
 file_mtime() {
 	local path="$1"
 	local mt=""
@@ -72,9 +82,15 @@ file_mtime() {
 # Render a pre-merged stack file (stacks/*.yml) through tools/render_compose.py.
 # This performs per-service ${VAR} substitution using each service's env_file(s)
 # and writes the result to .rendered/ (which is git-ignored).
-# The rendered file — never the source stack file — is what docker stack deploy reads.
+# The rendered file -- never the source stack file -- is what docker stack deploy reads.
+#
+# By default, render failure is FATAL because deploying unrendered stacks
+# leads to broken ${VAR} placeholders and incorrect env_file path resolution.
+# Pass allow_fallback=1 to restore the old warn-and-fallback behaviour
+# (only for debugging; never in production).
 render_stack_file() {
 	local in_file="$1"
+	local allow_fallback="${2:-0}"
 	local stack_name
 	stack_name="$(basename "${in_file%.yml}")"
 	stack_name="${stack_name%.yaml}"
@@ -90,12 +106,23 @@ render_stack_file() {
 			printf '%s\n' "$out_file"
 			return 0
 		else
-			log "Warning: render failed for $in_file; deploying unrendered (labels with \${VAR} may not resolve)"
+			if [[ "$allow_fallback" -eq 1 ]]; then
+				log "Warning: render failed for $in_file; deploying unrendered (labels with \${VAR} may not resolve)"
+				printf '%s\n' "$in_file"
+				return 0
+			fi
+			err "Render failed for $in_file. Ensure ruamel.yaml is installed (pip3 install -r tools/requirements.txt) and that all service env_file paths exist. Re-run with --allow-unrendered only for debugging."
+			exit 2
 		fi
-	else
-		log "Warning: python3 not found; skipping render for $in_file (labels with \${VAR} may not resolve)"
 	fi
-	printf '%s\n' "$in_file"
+
+	if [[ "$allow_fallback" -eq 1 ]]; then
+		log "Warning: python3 not found; skipping render for $in_file (labels with \${VAR} may not resolve)"
+		printf '%s\n' "$in_file"
+		return 0
+	fi
+	err "python3 not found -- cannot render $in_file. Install python3 and re-run, or use --allow-unrendered only for debugging."
+	exit 2
 }
 
 # Prefer docker compose plugin, fall back to docker-compose if available
@@ -538,6 +565,7 @@ cmd_up() {
 	local FOLLOW_LOGS=true
 	local DRY_RUN=false
 	local SKIP_GENERATE=false
+	local ALLOW_UNRENDERED=false
 	TARGET_STACKS=("${STACK_FILES[@]}")
 
 	while [[ $# -gt 0 ]]; do
@@ -548,11 +576,13 @@ cmd_up() {
 				DRY_RUN=true; shift ;;
 			--skip-generate)
 				SKIP_GENERATE=true; shift ;;
+			--allow-unrendered)
+				ALLOW_UNRENDERED=true; shift ;;
 			-s|--stacks)
 				[[ $# -lt 2 ]] && { err "--stacks requires a value"; exit 2; }
 				set_target_stacks "${2:-}"; shift 2 ;;
 			-h|--help)
-				log "Deploy stacks and optionally follow logs. Options: -n/--no-logs, --dry-run, --skip-generate, -s/--stacks <list> (comma-separated: ${STACK_FILES[*]})"; exit 0 ;;
+				log "Deploy stacks and optionally follow logs. Options: -n/--no-logs, --dry-run, --skip-generate, --allow-unrendered, -s/--stacks <list> (comma-separated: ${STACK_FILES[*]})"; exit 0 ;;
 			--)
 				shift; break ;;
 			-*)
@@ -565,6 +595,21 @@ cmd_up() {
 	check_command docker
 	ensure_swarm_info
 	ensure_traefik_network "$DRY_RUN"
+
+	# Verify render dependencies before attempting any deployment.
+	# Deploying unrendered stacks causes broken ${VAR} placeholders and
+	# incorrect env_file path resolution (Docker resolves them relative to
+	# the stack file, not the repo root).
+	if [[ "$ALLOW_UNRENDERED" = false ]]; then
+		if [[ "$DRY_RUN" = false ]]; then
+			check_render_deps
+			log "Render dependencies OK (ruamel.yaml available)"
+		else
+			if ! python3 -c "import ruamel.yaml" 2>/dev/null; then
+				log "DRY-RUN: ruamel.yaml not available -- render step will be skipped in dry-run mode"
+			fi
+		fi
+	fi
 
 	# Auto-regenerate stacks when any compose/fragment source is newer than the oldest stack file
 	if [[ "$SKIP_GENERATE" = false ]] && command -v python3 >/dev/null 2>&1; then
@@ -604,7 +649,9 @@ cmd_up() {
 		# each service's env_file(s). The rendered file is git-ignored; the source
 		# stack file (with placeholders) is what gets committed.
 		local render_file
-		render_file="$(render_stack_file "$file")"
+		local fallback=0
+		[[ "$ALLOW_UNRENDERED" = true ]] && fallback=1
+		render_file="$(render_stack_file "$file" "$fallback")"
 		if [[ "$DRY_RUN" = true ]]; then
 			log "DRY-RUN: would run: docker stack deploy -c $render_file $stack"
 			log "DRY-RUN: validating rendered file: $render_file"
@@ -769,6 +816,17 @@ cmd_doctor() {
 		log "Found: docker-compose (legacy)"
 	else
 		err "Missing both 'docker compose' and 'docker-compose'"
+	fi
+
+	# Render toolchain
+	if command -v python3 >/dev/null 2>&1; then
+		if python3 -c "import ruamel.yaml" 2>/dev/null; then
+			log "OK: render toolchain (python3 + ruamel.yaml) available"
+		else
+			log "NOTE: python3 found but ruamel.yaml is missing. Install with: pip3 install -r tools/requirements.txt"
+		fi
+	else
+		log "NOTE: python3 not found -- stack rendering will not be available"
 	fi
 
 	# Swarm state
