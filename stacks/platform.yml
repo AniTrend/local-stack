@@ -9,7 +9,7 @@ networks:
     external: true
 services:
   edge-graphql:
-    image: ghcr.io/anitrend/edge-graphql:0.1.10
+    image: ghcr.io/anitrend/edge-graphql:0.1.11
     networks:
       default:
         aliases:
