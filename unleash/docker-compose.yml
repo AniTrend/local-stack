@@ -7,18 +7,24 @@ services:
     env_file: .env
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
-      - 'traefik.http.routers.unleash-admin.rule=Host(`${UNLEASH_HOST}`) && PathPrefix(`/admin`)'
+      - >-
+        traefik.http.routers.unleash-admin.rule=Host(`${UNLEASH_HOST}`)
+        && PathPrefix(`/admin`)
       - 'traefik.http.services.unleash.loadbalancer.server.port=${UNLEASH_PORT}'
       - 'traefik.http.routers.unleash-admin.entrypoints=web,websecure'
       - 'traefik.http.routers.unleash-admin.service=unleash'
       - 'traefik.http.routers.unleash-admin.tls=true'
       - 'traefik.http.routers.unleash-admin.tls.certresolver=${CERT_RESOLVER}'
-      - 'traefik.http.routers.unleash-client.rule=Host(`${UNLEASH_HOST}`) && PathPrefix(`/client`)'
+      - >-
+        traefik.http.routers.unleash-client.rule=Host(`${UNLEASH_HOST}`)
+        && PathPrefix(`/client`)
       - 'traefik.http.routers.unleash-client.entrypoints=web,websecure'
       - 'traefik.http.routers.unleash-client.service=unleash'
       - 'traefik.http.routers.unleash-client.tls=true'
       - 'traefik.http.routers.unleash-client.tls.certresolver=${CERT_RESOLVER}'
-      - 'traefik.http.routers.unleash-api.rule=Host(`${UNLEASH_HOST}`) && PathPrefix(`/api`)'
+      - >-
+        traefik.http.routers.unleash-api.rule=Host(`${UNLEASH_HOST}`)
+        && PathPrefix(`/api`)
       - 'traefik.http.routers.unleash-api.entrypoints=web,websecure'
       - 'traefik.http.routers.unleash-api.service=unleash'
       - 'traefik.http.routers.unleash-api.tls=true'
@@ -36,7 +42,10 @@ services:
         max-size: "10m"
         max-file: 3
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:${UNLEASH_PORT}/health"]
+      test: [
+        "CMD", "wget", "--no-verbose", "--tries=1",
+        "--spider", "http://127.0.0.1:${UNLEASH_PORT}/health"
+      ]
       interval: 10s
       timeout: 5s
       retries: 5

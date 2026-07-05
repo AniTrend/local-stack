@@ -1,3 +1,4 @@
+---
 services:
   doco-cd:
     image: ghcr.io/kimdre/doco-cd:0.94.0
