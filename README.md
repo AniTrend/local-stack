@@ -46,6 +46,11 @@ A local development environment for the AniTrend stack, providing a complete inf
   - A/B testing
   - Feature experimentation
 
+- **Unleash**
+  - Feature flag platform (coexists with GrowthBook)
+  - Admin UI and client API
+  - Intended as the primary flagging backend for on-the-edge and future services
+
 ### Container Management
 
 - **Portainer**
@@ -221,6 +226,9 @@ Then start a service in its directory (e.g., `cd traefik && docker compose up -d
 local-stack/
 ├── apisix/           # API Gateway configuration
 ├── anitrend/         # AniTrend application specific configs
+├── beszel/           # Lightweight server monitoring
+├── deploy/           # Deployment runners (Doco-CD)
+├── doco-cd/          # Doco-CD bootstrap config
 ├── edge-graphql/     # GraphQL gateway for edge services
 ├── growthbook/       # Feature flag management
 ├── mongo/           # MongoDB configuration
@@ -229,8 +237,31 @@ local-stack/
 ├── portainer/       # Container management
 ├── postgres/        # PostgreSQL configuration
 ├── redis/          # Redis configuration
-└── traefik/        # Reverse proxy router configuration
+├── traefik/        # Reverse proxy router configuration
+└── unleash/        # Feature flag platform
 ```
+
+## Deployment Automation
+
+Dependency updates on `dev` are gated through Renovate, OpenCode risk review, branch protection, and finally Doco-CD for automated Swarm deployment.
+
+### Flow
+
+```
+Renovate PR → OpenCode risk gate → CI validation → approved merge → Doco-CD detects change on dev → deploys via stackctl.sh
+```
+
+Patch/minor Docker image updates may auto-merge after validation passes and OpenCode classifies them as low risk. Major updates, stateful service updates (postgres, mongo, redis, etcd, grafana, prometheus, loki, tempo, portainer, growthbook), and unknown-risk updates require manual promotion.
+
+### Components
+
+- `doco-cd/`: Host-level bootstrap for the Doco-CD deployment controller. Deploy manually first.
+- `deploy/doco/local-stack-deployer/`: One-shot runner that fetches the repo, runs `stackctl.sh`, and deploys Swarm stacks.
+- `.doco-cd.yml`: Root config telling Doco-CD which compose files to deploy and how to trigger.
+- `.github/renovate.json`: Weekly Docker and GitHub Actions dependency updates grouped by risk.
+- `.github/workflows/renovate-opencode-gate.yml`: OpenCode-based risk classifier for Renovate PRs.
+
+See `doco-cd/README.md` for bootstrap instructions and `deploy/doco/local-stack-deployer/README.md` for runner configuration.
 
 ## Configuration
 

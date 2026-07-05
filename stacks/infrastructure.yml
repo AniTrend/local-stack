@@ -240,6 +240,7 @@ services:
           - postgres
     volumes:
       - data:/var/lib/postgresql
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
     env_file: ./postgres/.env
     labels:
       - traefik.enable=${TRAEFIK_ENABLE}

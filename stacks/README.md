@@ -9,7 +9,7 @@
 
 - `infrastructure.yml`: Traefik, Portainer, APISIX (gateway + etcd + dashboard), Postgres, Mongo, Redis
 - `observability.yml`: Prometheus, Grafana, Loki, Tempo, OTel Collector
-- `platform.yml`: GrowthBook (dashboard + proxy), AniTrend apps/services (`anitrend`, `on-the-edge`, `edge-graphql`)
+- `platform.yml`: GrowthBook (dashboard + proxy), Unleash, AniTrend apps/services (`anitrend`, `on-the-edge`, `edge-graphql`)
 
 ## Conventions
 
@@ -113,6 +113,10 @@ docker stack rm platform
 docker stack rm observability
 docker stack rm infrastructure
 ```
+
+### Doco-CD automated deployment
+
+Doco-CD deploys via the `local-stack-deployer` runner service (see `../deploy/doco/local-stack-deployer/`). The runner uses `stackctl.sh` and never deploys unresolved `stacks/*.yml` directly. Even when triggered automatically, the canonical render→deploy flow is preserved.
 
 ### Rendered output
 

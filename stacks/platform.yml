@@ -186,6 +186,70 @@ services:
         delay: 10s
         max_attempts: 10
         window: 180s
+  unleash:
+    image: unleashorg/unleash-server:6.15
+    env_file: ./unleash/.env
+    labels:
+      - traefik.enable=${TRAEFIK_ENABLE}
+      - traefik.http.routers.unleash-admin.rule=Host(`${UNLEASH_HOST}`) && PathPrefix(`/admin`)
+      - traefik.http.services.unleash.loadbalancer.server.port=${UNLEASH_PORT}
+      - traefik.http.routers.unleash-admin.entrypoints=web,websecure
+      - traefik.http.routers.unleash-admin.service=unleash
+      - traefik.http.routers.unleash-admin.tls=true
+      - traefik.http.routers.unleash-admin.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.routers.unleash-client.rule=Host(`${UNLEASH_HOST}`) && PathPrefix(`/client`)
+      - traefik.http.routers.unleash-client.entrypoints=web,websecure
+      - traefik.http.routers.unleash-client.service=unleash
+      - traefik.http.routers.unleash-client.tls=true
+      - traefik.http.routers.unleash-client.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.routers.unleash-api.rule=Host(`${UNLEASH_HOST}`) && PathPrefix(`/api`)
+      - traefik.http.routers.unleash-api.entrypoints=web,websecure
+      - traefik.http.routers.unleash-api.service=unleash
+      - traefik.http.routers.unleash-api.tls=true
+      - traefik.http.routers.unleash-api.tls.certresolver=${CERT_RESOLVER}
+      - traefik.http.routers.unleash-frontend.rule=Host(`${UNLEASH_HOST}`)
+      - traefik.http.routers.unleash-frontend.entrypoints=web,websecure
+      - traefik.http.routers.unleash-frontend.service=unleash
+      - traefik.http.routers.unleash-frontend.tls=true
+      - traefik.http.routers.unleash-frontend.tls.certresolver=${CERT_RESOLVER}
+    networks:
+      default:
+        aliases:
+          - unleash
+    logging:
+      options:
+        max-size: 10m
+        max-file: 3
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --spider
+        - http://127.0.0.1:${UNLEASH_PORT}/health
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 256M
+          cpus: '0.20'
+        limits:
+          memory: 800M
+          cpus: '0.80'
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 180s
   website:
     image: ghcr.io/anitrend/website:0.4.2
     networks:

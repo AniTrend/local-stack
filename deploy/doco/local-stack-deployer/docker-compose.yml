@@ -1,0 +1,20 @@
+services:
+  local-stack-deployer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local/local-stack-deployer:latest
+    environment:
+      LOCAL_STACK_REPOSITORY: "https://github.com/AniTrend/local-stack.git"
+      LOCAL_STACK_REF: "dev"
+      LOCAL_STACK_WORKDIR: "/workspace/local-stack"
+      LOCAL_STACK_DEPLOY_MODE: "secrets"
+      LOCAL_STACK_TARGET_STACKS: "infrastructure,observability,platform"
+    volumes:
+      - local-stack-workspace:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/local-stack/sops/age:/root/.config/sops/age:ro
+    restart: "no"
+
+volumes:
+  local-stack-workspace:

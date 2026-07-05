@@ -13,8 +13,8 @@
   "baseBranchPatterns": [
     "dev"
   ],
-  "autoApprove": true,
-  "automerge": true,
+  "autoApprove": false,
+  "automerge": false,
   "automergeType": "pr",
   "automergeStrategy": "rebase"
 }

@@ -4,7 +4,7 @@ Local-Stack is migrating from per-service Compose to modular Docker Swarm stacks
 
 ## Source Of Truth
 
-- Service folders are the source of truth for config: `traefik/`, `apisix/`, `observability/`, `postgres/`, `mongo/`, `redis/`, `growthbook/`, `portainer/`, `anitrend/`, `on-the-edge/`, `edge-graphql/`, `website/`, and `beszel/`.
+- Service folders are the source of truth for config: `traefik/`, `apisix/`, `observability/`, `postgres/`, `mongo/`, `redis/`, `growthbook/`, `unleash/`, `portainer/`, `anitrend/`, `on-the-edge/`, `edge-graphql/`, `website/`, and `beszel/`.
 - Generated Swarm stacks live in `stacks/`. Do not edit the rendered stack output directly; regenerate with `./stackctl.sh generate` or sync with `./stackctl.sh sync`. See [stacks/README.md](stacks/README.md).
 - Deprecated root-level `swarm.*.yml` files are not used for deployment.
 

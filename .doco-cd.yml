@@ -1,0 +1,17 @@
+name: local-stack-deployer
+reference: dev
+working_dir: deploy/doco/local-stack-deployer
+compose_files:
+  - docker-compose.yml
+
+webhook_filter: "^refs/heads/dev$"
+
+remove_orphans: true
+prune_images: true
+force_recreate: true
+force_image_pull: true
+timeout: 900
+git_depth: 10
+
+reconciliation:
+  enabled: true

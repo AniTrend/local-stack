@@ -1,0 +1,35 @@
+services:
+  doco-cd:
+    image: ghcr.io/kimdre/doco-cd:0.94.0
+    container_name: doco-cd
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8088:80"
+    environment:
+      TZ: Africa/Johannesburg
+      WEBHOOK_SECRET_FILE: /run/secrets/doco_webhook_secret
+      API_SECRET_FILE: /run/secrets/doco_api_secret
+      POLL_CONFIG: |
+        - url: https://github.com/AniTrend/local-stack.git
+          reference: refs/heads/dev
+          interval: 300s
+    volumes:
+      - doco-cd-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    secrets:
+      - doco_webhook_secret
+      - doco_api_secret
+    networks:
+      - doco-private
+
+secrets:
+  doco_webhook_secret:
+    file: ./secrets/webhook_secret
+  doco_api_secret:
+    file: ./secrets/api_secret
+
+volumes:
+  doco-cd-data:
+
+networks:
+  doco-private:

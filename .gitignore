@@ -15,3 +15,6 @@ __pycache__/
 
 # Deepwork session tracking
 .slim/deepwork/
+
+# Doco-CD bootstrap secrets
+doco-cd/secrets/

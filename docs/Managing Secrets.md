@@ -140,3 +140,13 @@ find . -name '.env.enc' -exec sops updatekeys --yes {} \;
 - **`sops` can't decrypt**: Ensure the age private key is at `~/.config/sops/age/keys.txt` and the corresponding public key is in `.sops.yaml`.
 - **`shred` not found**: The script falls back to `rm -f`. Install `shred` (part of `coreutils` on Linux) for secure deletion.
 - **`sops` or `age` not found**: Run `./stackctl.sh doctor` to check prerequisites, or install them manually.
+
+## Doco-CD Runner Usage
+
+The Doco-CD deploy runner (`deploy/doco/local-stack-deployer/`) uses SOPS + age to decrypt secrets during automated deployments. The runner mounts the age private key read-only at `/root/.config/sops/age/keys.txt`.
+
+Key differences from interactive use:
+- The age key must be available at `/opt/local-stack/sops/age/keys.txt` on the Docker host.
+- The runner runs `./stackctl.sh secrets deploy` in a single step — no manual decrypt/edit/re-encrypt workflow.
+- Plaintext `.env` files are cleaned up automatically after deployment (shredded when available).
+- Expected verification: `find . -name .env -print` should return no plaintext env files matching any `.env.enc`.

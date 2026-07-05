@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Dependabot Risk Review Output",
+  "description": "Schema for OpenCode Dependabot Docker risk review output in local-stack.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "decision",
+    "risk",
+    "automerge_allowed",
+    "dependency_ecosystem",
+    "update_type",
+    "summary"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "local-stack.dependabot-risk.v1"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["approve", "changes_requested", "neutral"]
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "unknown"]
+    },
+    "automerge_allowed": {
+      "type": "boolean"
+    },
+    "dependency_ecosystem": {
+      "type": "string",
+      "enum": ["docker", "github-actions", "mixed", "unknown"]
+    },
+    "update_type": {
+      "type": "string",
+      "enum": ["semver-patch", "semver-minor", "semver-major", "digest", "non-semver", "unknown"]
+    },
+    "changed_images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "from", "to"],
+        "properties": {
+          "name": {"type": "string"},
+          "from": {"type": "string"},
+          "to": {"type": "string"},
+          "risk_reason": {"type": "string"}
+        }
+      }
+    },
+    "changed_files": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "breaking_change_assessment": {
+      "type": "string"
+    },
+    "runtime_impact": {
+      "type": "string"
+    },
+    "required_checks": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "manual_follow_up": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "sources_checked": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    }
+  }
+}

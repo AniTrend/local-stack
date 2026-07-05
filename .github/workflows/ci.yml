@@ -44,9 +44,9 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
 
-  stack-sync-check:
+  validate-stack:
     needs: [lint]
-    name: Stack drift check
+    name: Validate stack
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -54,9 +54,9 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.x'
-      - name: Install PyYAML
-        run: pip install PyYAML
+          python-version: '3.12'
+      - name: Install render dependencies
+        run: pip install -r tools/requirements.txt
       - name: Check stacks are in sync with compose sources
         run: python3 tools/generate_stacks.py --output-dir /tmp/stacks-check
       - name: Diff generated vs committed stacks
@@ -76,3 +76,5 @@ jobs:
             echo "Run './stackctl.sh generate' and commit the result."
             exit 1
           fi
+      - name: Dry-run stack rendering
+        run: ./stackctl.sh up --dry-run --no-logs
