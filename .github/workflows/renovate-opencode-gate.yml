@@ -17,7 +17,7 @@ permissions:
 jobs:
   gate:
     name: Renovate OpenCode gate
-    if: github.actor == 'renovate[bot]'
+    if: github.actor == 'renovate'
     runs-on: ubuntu-latest
     steps:
       - name: Fetch Dependabot metadata
@@ -40,16 +40,26 @@ jobs:
       - name: Build deterministic review context
         run: bash tools/ci/build-renovate-review-context.sh
 
+      - name: Assemble prompt from template and context
+        run: |
+          echo 'prompt<<EOF' >> "$GITHUB_OUTPUT"
+          cat .github/prompts/renovate-docker-risk-review.md >> "$GITHUB_OUTPUT"
+          echo '' >> "$GITHUB_OUTPUT"
+          echo '## PR context' >> "$GITHUB_OUTPUT"
+          cat .review/context.json >> "$GITHUB_OUTPUT"
+          echo '' >> "$GITHUB_OUTPUT"
+          echo 'Write your JSON response to .review/opencode-result.json and exit.' >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+        id: prompt
+
       - name: Run OpenCode review
         id: opencode
         uses: anomalyco/opencode/github@latest
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-          model: opencode/deepseek-v4-flash
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          prompt-file: .github/prompts/renovate-docker-risk-review.md
-          context-file: .review/context.json
-          output-file: .review/opencode-result.json
+          model: opencode/deepseek-v4-flash
+          prompt: ${{ steps.prompt.outputs.prompt }}
 
       - name: Validate OpenCode output schema
         run: python3 tools/ci/validate-opencode-risk-output.py .review/opencode-result.json
