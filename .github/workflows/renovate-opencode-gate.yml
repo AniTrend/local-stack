@@ -50,6 +50,13 @@ jobs:
           echo 'EOF' >> "$GITHUB_OUTPUT"
         id: prompt
 
+      - name: Generate app token
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Run OpenCode review
         id: opencode
         uses: anomalyco/opencode/github@latest
@@ -58,6 +65,7 @@ jobs:
         with:
           model: opencode/deepseek-v4-flash
           prompt: ${{ steps.prompt.outputs.prompt }}
+          github_token: ${{ steps.app-token.outputs.token }}
 
       - name: Validate OpenCode output schema
         run: python3 tools/ci/validate-opencode-risk-output.py .review/opencode-result.json
