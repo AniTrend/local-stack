@@ -187,7 +187,7 @@ services:
         max_attempts: 10
         window: 180s
   unleash:
-    image: unleashorg/unleash-server:6.15
+    image: unleashorg/unleash-server:8.0
     env_file: ./unleash/.env
     labels:
       - traefik.enable=${TRAEFIK_ENABLE}
