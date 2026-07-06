@@ -10,14 +10,14 @@ permissions:
 jobs:
   sync:
     name: Regenerate stacks for Renovate PRs
-    if: github.actor == 'renovate[bot]' && github.event.pull_request.head.repo.full_name == github.repository
+    if: contains(github.event.pull_request.user.login, 'renovate') && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Generate app token
         uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ secrets.APP_ID }}
+          client-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
 
       - name: Checkout Renovate branch
@@ -41,6 +41,5 @@ jobs:
       - name: Commit regenerated stacks when drift exists
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
-          token: ${{ steps.app-token.outputs.token }}
           commit_message: "chore(stacks): sync generated stacks for renovate update"
           file_pattern: stacks/*.yml
