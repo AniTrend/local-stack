@@ -42,7 +42,10 @@ jobs:
 
       - name: Run OpenCode review
         id: opencode
-        uses: anomalyco/opencode/github@main
+        uses: anomalyco/opencode/github@latest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          model: opencode/deepseek-v4-flash
         with:
           prompt-file: .github/prompts/renovate-docker-risk-review.md
           context-file: .review/context.json
