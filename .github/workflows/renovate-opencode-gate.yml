@@ -17,7 +17,7 @@ permissions:
 jobs:
   gate:
     name: Renovate OpenCode gate
-    if: github.actor == 'renovate'
+    if: github.actor == 'renovate[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Fetch Dependabot metadata
