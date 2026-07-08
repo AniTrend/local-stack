@@ -1,77 +1,69 @@
 name: Renovate OpenCode gate
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - synchronize
       - reopened
       - ready_for_review
+    branches:
+      - dev
 
 permissions:
   contents: read
   pull-requests: write
   issues: write
   checks: read
-  id-token: write
 
 jobs:
   gate:
     name: Renovate OpenCode gate
-    if: contains(github.event.pull_request.user.login, 'renovate')
+    if: ${{ github.event.pull_request.user.login == 'renovate[bot]' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
 
-      - name: Collect PR changed files and patch metadata
+    steps:
+      # Checkout the trusted base branch only. Never checkout PR head code under
+      # pull_request_target — PR head code is untrusted and must not be executed.
+      - name: Checkout trusted base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+
+      # PR metadata is fetched via gh CLI (GitHub API), not from the PR head checkout.
+      # This is safe under pull_request_target because gh pr diff/view use the API token.
+      - name: Collect PR metadata
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           mkdir -p .review
           gh pr diff "$PR" --repo "$REPO" --name-only > .review/files.txt
           gh pr diff "$PR" --repo "$REPO" > .review/patch.diff
           gh pr view "$PR" --repo "$REPO" --json title,body,author,baseRefName,headRefName,labels > .review/pr.json
 
-      - name: Build deterministic review context
+      - name: Build review context
         run: bash tools/ci/build-renovate-review-context.sh
 
-      - name: Assemble prompt from template and context
+      - name: Install OpenCode CLI
         run: |
-          echo 'prompt<<EOF' >> "$GITHUB_OUTPUT"
-          cat .github/prompts/renovate-docker-risk-review.md >> "$GITHUB_OUTPUT"
-          echo '' >> "$GITHUB_OUTPUT"
-          echo '## PR context' >> "$GITHUB_OUTPUT"
-          cat .review/context.json >> "$GITHUB_OUTPUT"
-          echo '' >> "$GITHUB_OUTPUT"
-          echo 'Write your JSON response to .review/opencode-result.json and exit.' >> "$GITHUB_OUTPUT"
-          echo 'EOF' >> "$GITHUB_OUTPUT"
-        id: prompt
+          set -euo pipefail
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
-      - name: Generate app token
-        uses: actions/create-github-app-token@v3
-        id: app-token
-        with:
-          client-id: ${{ secrets.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Run OpenCode review
-        id: opencode
-        uses: anomalyco/opencode/github@latest
+      - name: Run OpenCode risk review
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-        with:
-          model: opencode/deepseek-v4-flash
-          prompt: ${{ steps.prompt.outputs.prompt }}
-          github_token: ${{ steps.app-token.outputs.token }}
+        run: bash tools/ci/run-risk-review.sh
 
-      - name: Validate OpenCode output schema
+      - name: Validate output
         run: python3 tools/ci/validate-opencode-risk-output.py .review/opencode-result.json
 
-      - name: Comment review result
+      - name: Comment result
         run: python3 tools/ci/comment-opencode-risk-review.py .review/opencode-result.json "${{ secrets.GITHUB_TOKEN }}" "${{ github.repository }}" "${{ github.event.pull_request.number }}"
 
-      - name: Apply PR review decision
+      - name: Apply decision
         run: python3 tools/ci/apply-opencode-review-decision.py .review/opencode-result.json "${{ secrets.GITHUB_TOKEN }}" "${{ github.repository }}" "${{ github.event.pull_request.number }}"

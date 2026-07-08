@@ -1,0 +1,17 @@
+{
+  "schema_version": "local-stack.dependabot-risk.v1",
+  "decision": "changes_requested",
+  "risk": "high",
+  "automerge_allowed": true,
+  "dependency_ecosystem": "docker",
+  "update_type": "semver-major",
+  "summary": "Breaking migration detected.",
+  "changed_images": [],
+  "changed_files": [],
+  "breaking_change_assessment": "Breaks storage format.",
+  "runtime_impact": "Migration required.",
+  "required_checks": [],
+  "manual_follow_up": [],
+  "sources_checked": [],
+  "confidence": "high"
+}

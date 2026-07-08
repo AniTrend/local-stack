@@ -1,0 +1,12 @@
+{
+  "schema_version": "local-stack.dependabot-risk.v1",
+  "decision": "approve",
+  "risk": "medium",
+  "automerge_allowed": false,
+  "dependency_ecosystem": "docker",
+  "update_type": "semver-patch",
+  "summary": "Patch update with medium risk.",
+  "changed_images": [],
+  "changed_files": ["traefik/docker-compose.yml"],
+  "confidence": "high"
+}
