@@ -1,0 +1,12 @@
+{
+  "schema_version": "local-stack.dependabot-risk.v1",
+  "decision": "approve",
+  "risk": "low",
+  "automerge_allowed": false,
+  "dependency_ecosystem": "github-actions",
+  "update_type": "semver-patch",
+  "summary": "Workflow change approved incorrectly.",
+  "changed_images": [],
+  "changed_files": [".github/workflows/ci.yml"],
+  "confidence": "high"
+}

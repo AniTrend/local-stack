@@ -5,6 +5,13 @@ Reads raw model output, strips ANSI, locates the first valid JSON object
 with the correct schema_version, and writes it to the output file. If no
 valid object is found, writes a neutral fallback. Always exits 0 so the
 workflow never fails on extraction alone — validation handles rejection.
+
+Exit codes:
+  0 — Successfully extracted JSON OR wrote neutral fallback.
+       Extraction failure is NOT distinguishable by exit code. The downstream
+       validator (validate-opencode-risk-output.py) is expected to accept the
+       neutral fallback and enforce correctness via schema + safety rules.
+  2 — Usage error (wrong number of arguments).
 """
 
 import json

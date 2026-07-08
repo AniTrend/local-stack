@@ -10,7 +10,7 @@ IFS=$'\n\t'
 #   - OPENCODE_API_KEY is set in the environment
 # ---------------------------------------------------------------------------
 
-PROMPT_TEMPLATE=".github/prompts/renovate-docker-risk-review.md"
+PROMPT_TEMPLATE=".github/prompts/renovate-dependency-risk-review.md"
 CONTEXT_JSON=".review/context.json"
 PROMPT_FILE=".review/opencode-prompt.md"
 RAW_OUTPUT=".review/opencode-result.raw"

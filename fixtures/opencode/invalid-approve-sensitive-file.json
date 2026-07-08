@@ -1,0 +1,12 @@
+{
+  "schema_version": "local-stack.dependabot-risk.v1",
+  "decision": "approve",
+  "risk": "low",
+  "automerge_allowed": false,
+  "dependency_ecosystem": "docker",
+  "update_type": "semver-patch",
+  "summary": "Sensitive file change approved incorrectly.",
+  "changed_images": [],
+  "changed_files": ["postgres/docker-compose.yml", ".sops.yaml"],
+  "confidence": "high"
+}
