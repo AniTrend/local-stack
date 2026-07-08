@@ -1,0 +1,17 @@
+{
+  "schema_version": "local-stack.dependabot-risk.v1",
+  "decision": "approve",
+  "risk": "low",
+  "automerge_allowed": true,
+  "dependency_ecosystem": "docker",
+  "update_type": "semver-major",
+  "summary": "Major version bump.",
+  "changed_images": [],
+  "changed_files": [],
+  "breaking_change_assessment": "None.",
+  "runtime_impact": "None.",
+  "required_checks": [],
+  "manual_follow_up": [],
+  "sources_checked": [],
+  "confidence": "high"
+}

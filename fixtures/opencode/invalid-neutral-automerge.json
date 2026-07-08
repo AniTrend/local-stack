@@ -1,0 +1,17 @@
+{
+  "schema_version": "local-stack.dependabot-risk.v1",
+  "decision": "neutral",
+  "risk": "medium",
+  "automerge_allowed": true,
+  "dependency_ecosystem": "github-actions",
+  "update_type": "semver-major",
+  "summary": "Major update.",
+  "changed_images": [],
+  "changed_files": [],
+  "breaking_change_assessment": "Not assessed.",
+  "runtime_impact": "Unknown.",
+  "required_checks": [],
+  "manual_follow_up": [],
+  "sources_checked": [],
+  "confidence": "medium"
+}
