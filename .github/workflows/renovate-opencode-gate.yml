@@ -23,6 +23,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Generate app token
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
       # Checkout the trusted base branch only. Never checkout PR head code under
       # pull_request_target — PR head code is untrusted and must not be executed.
       - name: Checkout trusted base
@@ -63,7 +70,7 @@ jobs:
         run: python3 tools/ci/validate-opencode-risk-output.py .review/opencode-result.json
 
       - name: Comment result
-        run: python3 tools/ci/comment-opencode-risk-review.py .review/opencode-result.json "${{ secrets.GITHUB_TOKEN }}" "${{ github.repository }}" "${{ github.event.pull_request.number }}"
+        run: python3 tools/ci/comment-opencode-risk-review.py .review/opencode-result.json "${{ steps.app-token.outputs.token }}" "${{ github.repository }}" "${{ github.event.pull_request.number }}"
 
       - name: Apply decision
-        run: python3 tools/ci/apply-opencode-review-decision.py .review/opencode-result.json "${{ secrets.GITHUB_TOKEN }}" "${{ github.repository }}" "${{ github.event.pull_request.number }}"
+        run: python3 tools/ci/apply-opencode-review-decision.py .review/opencode-result.json "${{ steps.app-token.outputs.token }}" "${{ github.repository }}" "${{ github.event.pull_request.number }}"
