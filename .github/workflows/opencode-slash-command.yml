@@ -1,0 +1,115 @@
+name: OpenCode Slash Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  run:
+    name: OpenCode /oc command
+    if: |
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/oc') &&
+      github.event.comment.author_association == 'OWNER'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate app token
+        uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - name: Acknowledge command
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api \
+            "repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions" \
+            -X POST \
+            -f content='rocket'
+
+      - name: Fetch PR metadata
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          mkdir -p .review
+
+          # Full PR data as JSON for OpenCode context
+          gh pr view "$PR" --json title,body,labels,baseRefName > .review/pr.json
+
+          # PR diff for analysis
+          gh pr diff "$PR" > .review/patch.diff
+
+          # PR title for the OpenCode prompt
+          PR_TITLE=$(gh pr view "$PR" --json title -q '.title')
+          echo "title=$PR_TITLE" >> "$GITHUB_OUTPUT"
+
+      # Checkout dev (the fixed base branch for renovate PRs). PR head code is
+      # untrusted and must not be executed. We only need the repo's tooling and
+      # workflow definitions; all PR content is accessed via the GitHub API.
+      - name: Checkout trusted base (dev)
+        uses: actions/checkout@v7
+        with:
+          ref: dev
+          persist-credentials: false
+
+      - name: Extract prompt
+        id: prompt
+        env:
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          # Strip the leading "/oc" (with optional space) from the comment body.
+          PROMPT="${BODY#/oc }"
+          PROMPT="${PROMPT#/oc}"
+          {
+            echo 'text<<OC_PROMPT_DELIM'
+            printf '%s\n' "$PROMPT"
+            echo 'OC_PROMPT_DELIM'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install OpenCode CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://opencode.ai/install | bash
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: Assemble OpenCode prompt
+        run: |
+          cat > .review/oc-prompt.md << 'PROMPT_EOF'
+          You are assisting with a task on the local-stack infrastructure repository.
+          You have access to the `gh` CLI authenticated via GH_TOKEN to interact
+          with GitHub (create issues, comment, review, etc.).
+
+          PR context:
+          - Repository: ${{ github.repository }}
+          - PR number: ${{ github.event.issue.number }}
+          - PR title: ${{ steps.pr.outputs.title }}
+          - PR diff is available at .review/patch.diff
+          - PR metadata is available at .review/pr.json
+
+          Read the PR diff and metadata files to understand the changes before
+          acting on the task below.
+
+          ## Task
+          PROMPT_EOF
+          printf '%s\n' "${{ steps.prompt.outputs.text }}" >> .review/oc-prompt.md
+
+      - name: Run OpenCode
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          opencode run \
+            --title "OpenCode /oc command for PR #${{ github.event.issue.number }}" \
+            --model opencode/deepseek-v4-flash \
+            < .review/oc-prompt.md
