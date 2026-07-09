@@ -84,16 +84,9 @@ def apply_decision(output_file: str, gh_token: str, repo: str, pr_number: str) -
             check=True,
         )
 
-        if automerge_allowed:
-            print(f"Enabling auto-merge for PR #{pr_number}...")
-            subprocess.run(
-                ["gh", "pr", "merge", pr_number, "--repo", repo, "--auto", "--rebase"],
-                env=env,
-                check=False,  # Non-fatal: auto-merge may not be available yet
-            )
-
         # Second approval to satisfy branch protection requiring multiple approvals.
         # GitHub counts distinct review objects even from the same app installation.
+        # Must happen before auto-merge so both approvals exist when the merge queue activates.
         print(f"Adding second approval for PR #{pr_number}...")
         subprocess.run(
             ["gh", "pr", "review", pr_number, "--repo", repo, "--approve",
@@ -101,6 +94,14 @@ def apply_decision(output_file: str, gh_token: str, repo: str, pr_number: str) -
             env=env,
             check=True,
         )
+
+        if automerge_allowed:
+            print(f"Enabling auto-merge for PR #{pr_number}...")
+            subprocess.run(
+                ["gh", "pr", "merge", pr_number, "--repo", repo, "--auto", "--rebase"],
+                env=env,
+                check=False,  # Non-fatal: auto-merge may not be available yet
+            )
 
     elif decision == "changes_requested":
         print(f"Requesting changes on PR #{pr_number}...")

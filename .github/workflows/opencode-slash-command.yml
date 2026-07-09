@@ -68,14 +68,26 @@ jobs:
         env:
           BODY: ${{ github.event.comment.body }}
         run: |
-          # Strip the leading "/oc" (with optional space) from the comment body.
-          PROMPT="${BODY#/oc }"
-          PROMPT="${PROMPT#/oc}"
+          # Strip the "/oc" command prefix, then one optional leading space.
+          PROMPT="${BODY#/oc}"
+          PROMPT="${PROMPT# }"
           {
             echo 'text<<OC_PROMPT_DELIM'
             printf '%s\n' "$PROMPT"
             echo 'OC_PROMPT_DELIM'
           } >> "$GITHUB_OUTPUT"
+
+      - name: Guard against empty prompt
+        if: steps.prompt.outputs.text == ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api \
+            "repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            -X POST \
+            -f body='Usage: `/oc <task description>` — provide a task for OpenCode to perform on this PR.'
+          echo "Empty /oc prompt; exiting." >&2
+          exit 1
 
       - name: Install OpenCode CLI
         run: |
