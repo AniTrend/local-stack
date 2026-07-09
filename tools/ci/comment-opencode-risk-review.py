@@ -1,10 +1,59 @@
 #!/usr/bin/env python3
-"""Post a deterministic PR comment with the OpenCode risk review result."""
+"""Post or update a deterministic PR comment with the OpenCode risk review result."""
 
 import json
 import os
 import subprocess
 import sys
+
+# Unique header used to identify the bot's own comment for in-place updates.
+COMMENT_MARKER = "## OpenCode Dependabot Risk Review"
+
+
+def find_existing_comment_id(env: dict, repo: str, pr_number: str) -> str | None:
+    """Return the node_id of the first PR comment containing COMMENT_MARKER, or None."""
+    result = subprocess.run(
+        [
+            "gh", "api",
+            f"repos/{repo}/issues/{pr_number}/comments",
+            "--jq",
+            f'[.[] | select(.body | contains("{COMMENT_MARKER}"))][0].id',
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    comment_id = result.stdout.strip()
+    if result.returncode == 0 and comment_id and comment_id != "null":
+        return comment_id
+    return None
+
+
+def upsert_pr_comment(env: dict, repo: str, pr_number: str, comment_file: str) -> str:
+    """Update existing bot comment if it exists, otherwise create a new one.
+
+    Returns "updated" or "created".
+    """
+    existing_id = find_existing_comment_id(env, repo, pr_number)
+    if existing_id:
+        subprocess.run(
+            [
+                "gh", "api",
+                "-X", "PATCH",
+                f"repos/{repo}/issues/comments/{existing_id}",
+                "--input", comment_file,
+            ],
+            env=env,
+            check=True,
+        )
+        return "updated"
+    else:
+        subprocess.run(
+            ["gh", "pr", "comment", pr_number, "--repo", repo, "--body-file", comment_file],
+            env=env,
+            check=True,
+        )
+        return "created"
 
 
 def format_comment(data: dict) -> str:
@@ -92,13 +141,9 @@ def main(output_file: str, gh_token: str, repo: str, pr_number: str) -> int:
         f.write(comment)
 
     env = {**os.environ, "GH_TOKEN": gh_token}
-    subprocess.run(
-        ["gh", "pr", "comment", pr_number, "--repo", repo, "--body-file", comment_file],
-        env=env,
-        check=True,
-    )
+    action = upsert_pr_comment(env, repo, pr_number, comment_file)
 
-    print(f"Comment posted to PR #{pr_number}")
+    print(f"Comment {action} on PR #{pr_number}")
     return 0
 
 
