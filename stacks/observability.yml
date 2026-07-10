@@ -238,7 +238,7 @@ services:
           memory: 1200M
           cpus: '0.80'
   memcached:
-    image: memcached:1.6.44
+    image: memcached:1.6.45
     environment:
       - MEMCACHED_MAX_MEMORY=64m
       - MEMCACHED_THREADS=2
