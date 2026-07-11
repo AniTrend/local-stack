@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 # Unique header used to identify the bot's own neutral-decision comment for in-place updates.
 COMMENT_MARKER = "OpenCode risk gate"
@@ -36,9 +37,9 @@ def upsert_pr_comment(env: dict, repo: str, pr_number: str, body: str, marker: s
     """
     existing_id = find_existing_comment_id(env, repo, pr_number, marker)
     if existing_id:
-        import tempfile
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
-            f.write(body)
+        # GH API PATCH requires JSON; wrap the markdown body in a JSON object.
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"body": body}, f)
             tmp_path = f.name
         try:
             subprocess.run(

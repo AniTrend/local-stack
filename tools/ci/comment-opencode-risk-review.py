@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 # Unique header used to identify the bot's own comment for in-place updates.
 COMMENT_MARKER = "## OpenCode Dependabot Risk Review"
@@ -36,16 +37,25 @@ def upsert_pr_comment(env: dict, repo: str, pr_number: str, comment_file: str) -
     """
     existing_id = find_existing_comment_id(env, repo, pr_number)
     if existing_id:
-        subprocess.run(
-            [
-                "gh", "api",
-                "-X", "PATCH",
-                f"repos/{repo}/issues/comments/{existing_id}",
-                "--input", comment_file,
-            ],
-            env=env,
-            check=True,
-        )
+        # GH API PATCH requires JSON; wrap the markdown body in a JSON object.
+        with open(comment_file) as f:
+            body = f.read()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+            json.dump({"body": body}, f)
+            json_file = f.name
+        try:
+            subprocess.run(
+                [
+                    "gh", "api",
+                    "-X", "PATCH",
+                    f"repos/{repo}/issues/comments/{existing_id}",
+                    "--input", json_file,
+                ],
+                env=env,
+                check=True,
+            )
+        finally:
+            os.unlink(json_file)
         return "updated"
     else:
         subprocess.run(
