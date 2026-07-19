@@ -164,6 +164,14 @@ services:
       - traefik.http.routers.anitrend-edge.tls=true
       - traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}
       - traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f http://localhost:${PORT}/v1/health || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     logging:
       options:
         max-size: 10m
@@ -182,7 +190,7 @@ services:
           memory: 384M
           cpus: '0.50'
       restart_policy:
-        condition: on-failure
+        condition: any
         delay: 10s
         max_attempts: 10
         window: 180s
