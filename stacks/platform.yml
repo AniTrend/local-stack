@@ -167,7 +167,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - curl -f http://localhost:${PORT}/v1/health || exit 1
+        - curl -f http://localhost:${PORT}/v1/health
       interval: 30s
       timeout: 5s
       retries: 3
