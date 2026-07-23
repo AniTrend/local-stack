@@ -152,7 +152,7 @@ services:
         max_attempts: 0
         window: 120s
   mongo:
-    image: mongo:8.3.4
+    image: mongo:8.3.7
     networks:
       default:
         aliases:
