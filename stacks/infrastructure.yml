@@ -274,7 +274,7 @@ services:
         max_attempts: 0
         window: 120s
   redis:
-    image: redis:8.8-alpine
+    image: redis:8.10-alpine
     networks:
       default:
         aliases:
