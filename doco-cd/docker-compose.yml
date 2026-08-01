@@ -3,13 +3,25 @@ services:
   doco-cd:
     image: ghcr.io/kimdre/doco-cd:0.104.0
     container_name: doco-cd
+    networks:
+      - default
+    env_file: .env
+    labels:
+      - "traefik.enable=${TRAEFIK_ENABLE}"
+      - "traefik.http.routers.doco.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.doco.entrypoints=web,websecure"
+      - "traefik.http.routers.doco.service=doco"
+      - "traefik.http.routers.doco.tls=true"
+      - "traefik.http.routers.doco.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.services.doco.loadbalancer.server.port=${PORT}"
+      - "traefik.http.services.doco.loadbalancer.healthcheck.path=/health"
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8088:80"
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: 3
     environment:
-      TZ: Africa/Johannesburg
-      WEBHOOK_SECRET_FILE: /run/secrets/doco_webhook_secret
-      API_SECRET_FILE: /run/secrets/doco_api_secret
       POLL_CONFIG: |
         - url: https://github.com/AniTrend/local-stack.git
           reference: refs/heads/dev
@@ -20,8 +32,6 @@ services:
     secrets:
       - doco_webhook_secret
       - doco_api_secret
-    networks:
-      - doco-private
 
 secrets:
   doco_webhook_secret:
@@ -33,4 +43,6 @@ volumes:
   doco-cd-data:
 
 networks:
-  doco-private:
+  default:
+    name: traefik
+    external: true
