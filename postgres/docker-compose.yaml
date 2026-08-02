@@ -10,11 +10,15 @@ volumes:
 services:
   postgres:
     container_name: "postgres"
-    image: postgres:18
+    # Pinned to 17: the postgres-data volume holds a PG17 cluster in the pre-18
+    # layout (PGDATA directly at /var/lib/postgresql/data). Postgres 18+ refuses
+    # to start against that layout (docker-library/postgres#1259). To move to 18,
+    # run a proper 17->18 pg_upgrade first. See AGENTS.md / stacks README.
+    image: postgres:17
     networks:
       - default
     volumes:
-      - data:/var/lib/postgresql
+      - data:/var/lib/postgresql/data
       - ./init:/docker-entrypoint-initdb.d:ro
     env_file: .env
     labels:

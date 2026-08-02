@@ -13,7 +13,9 @@ services:
   doco-cd:
     image: ghcr.io/kimdre/doco-cd:0.105.0
     networks:
-      - default
+      default:
+        aliases:
+          - doco-cd
     env_file: ./doco-cd/.env
     labels:
       - traefik.enable=${TRAEFIK_ENABLE}
@@ -38,6 +40,20 @@ services:
     secrets:
       - doco_webhook_secret
       - doco_api_secret
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+      resources:
+        reservations:
+          memory: 96M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
   edge-graphql:
     image: ghcr.io/anitrend/edge-graphql:0.1.13
     networks:

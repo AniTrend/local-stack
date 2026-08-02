@@ -233,13 +233,13 @@ services:
           memory: 512M
           cpus: '0.50'
   postgres:
-    image: postgres:18
+    image: postgres:17
     networks:
       default:
         aliases:
           - postgres
     volumes:
-      - data:/var/lib/postgresql
+      - data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     env_file: ./postgres/.env
     labels:
