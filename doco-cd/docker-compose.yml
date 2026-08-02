@@ -1,5 +1,5 @@
 ---
-x-stack: platform
+# x-stack: platform
 services:
   doco-cd:
     image: ghcr.io/kimdre/doco-cd:0.106.0
@@ -28,17 +28,9 @@ services:
           reference: refs/heads/dev
           interval: 300s
     volumes:
+      - ./secrets:/secrets
       - doco-cd-data:/data
       - /var/run/docker.sock:/var/run/docker.sock
-    secrets:
-      - doco_webhook_secret
-      - doco_api_secret
-
-secrets:
-  doco_webhook_secret:
-    file: ./secrets/webhook_secret
-  doco_api_secret:
-    file: ./secrets/api_secret
 
 volumes:
   doco-cd-data:

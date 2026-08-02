@@ -20,7 +20,7 @@ accesslog:
 # (Optional) Enable API and Dashboard
 # ---
 api:
- dashboard: true
+ dashboard: false
  insecure: false
 
 # Entry Points configuration

@@ -1,5 +1,5 @@
 ---
-x-stack: infrastructure
+# x-stack: infrastructure
 volumes:
   data:
     name: postgres-data

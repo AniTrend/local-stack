@@ -1,5 +1,5 @@
 ---
-x-stack: platform
+# x-stack: platform
 services:
   unleash:
     container_name: "unleash"
