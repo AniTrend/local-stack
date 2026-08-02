@@ -1,0 +1,21 @@
+services:
+  doco-cd:
+    networks:
+      default:
+        aliases:
+          - doco-cd
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+      resources:
+        reservations:
+          memory: 96M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
+
