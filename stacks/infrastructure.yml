@@ -233,7 +233,7 @@ services:
           memory: 512M
           cpus: '0.50'
   postgres:
-    image: postgres:17
+    image: postgres:18
     networks:
       default:
         aliases:

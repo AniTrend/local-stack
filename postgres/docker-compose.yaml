@@ -14,7 +14,7 @@ services:
     # layout (PGDATA directly at /var/lib/postgresql/data). Postgres 18+ refuses
     # to start against that layout (docker-library/postgres#1259). To move to 18,
     # run a proper 17->18 pg_upgrade first. See AGENTS.md / stacks README.
-    image: postgres:17
+    image: postgres:18
     networks:
       - default
     volumes:
