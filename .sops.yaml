@@ -1,6 +1,7 @@
 # SOPS configuration for encrypting service-local .env files
 # Each service directory (e.g., postgres/, traefik/) stores an encrypted .env.enc
-# alongside its .env.example. Decrypt with: stackctl.sh secrets decrypt [service]
+# alongside its .env.example. Decrypt with: stackctl secrets decrypt [service]
+# (compatibility fallback: stackctl.sh secrets decrypt [service])
 creation_rules:
   - path_regex: \.env(\.enc)?$
     key_groups:

@@ -24,7 +24,7 @@ Analyze the Renovate PR metadata, changed files, and release notes context. Clas
 
 **REQUEST CHANGES when ANY are true:**
 - Generated stacks/*.yml are changed without matching source Compose/fragment changes.
-- .env.enc, .sops.yaml, stackctl.sh, tools/render_compose.py, tools/generate_stacks.py, or deployment scripts are modified by a dependency PR.
+- .env.enc, .sops.yaml, .stackctl, stackctl.sh, tools/render_compose.py, tools/generate_stacks.py, or deployment scripts are modified by a dependency PR.
 - A known breaking runtime migration is detected.
 - A workflow change weakens permissions, checkout safety, token boundaries, or branch protection assumptions.
 - OpenCode detects an unsafe or unexplained dependency change.
@@ -89,5 +89,10 @@ Use this context to determine:
 2. What services are affected.
 3. Whether the service is stateful.
 4. Whether generated stacks are changed without source changes.
+
+The `required_checks` commands use `./stackctl.sh` (the compatibility path)
+because this runner does not install the `stackctl` CLI, and the CLI's
+generated output is not yet byte-equivalent to committed `stacks/` files.
+Do not substitute `stackctl` commands for these checks.
 
 Do not fabricate release note information you don't have. If you cannot determine risk, set risk=unknown, decision=neutral, confidence=low.

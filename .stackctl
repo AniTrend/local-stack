@@ -1,0 +1,36 @@
+# stackctl configuration for AniTrend local-stack
+# Schema source of truth: https://github.com/AniTrend/stackctl (src/config/types.ts)
+# The `stackctl` CLI is the preferred interface; root `stackctl.sh` is a
+# compatibility fallback for the Doco-CD Linux runtime.
+
+# Project name used for stack naming and identification.
+project: "local-stack"
+
+# Stack generation settings
+stack:
+  # Subdirectory for generated stack files.
+  directory: "stacks"
+  # Stack names to generate (one per service group).
+  names:
+    - "infrastructure"
+    - "observability"
+    - "platform"
+  # External overlay network name for all stacks.
+  network: "traefik-public"
+  # Network driver (default: "overlay")
+  networkDriver: "overlay"
+
+# Rendering settings for env var interpolation
+render:
+  # Output directory for rendered files (default: ".rendered")
+  outputDirectory: ".rendered"
+
+# Environment file settings
+env:
+  # Active .env file name (default: ".env")
+  activeName: ".env"
+
+# Secrets management with SOPS/age
+secrets:
+  # Encrypted dotenv file name (default: ".env.enc")
+  encryptedFileName: ".env.enc"
