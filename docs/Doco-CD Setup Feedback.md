@@ -20,9 +20,9 @@ Evidence:
 
 Based on current evidence only:
 
-1. Generated stack drift (confirmed, separate from Doco-CD). Commit `7e6f882` commented out the `anitrend-edge` healthcheck in `on-the-edge/docker-compose.yaml:19-24`, but the committed `stacks/platform.yml` still carried that stale healthcheck block. The regenerated working tree removes it. This is a generated output synchronization issue: use `./stackctl.sh sync` to detect similar drift, and `./stackctl.sh generate` to update the output. Never hand-edit `stacks/`, per `AGENTS.md:5-9` and `stacks/README.md:1-7`.
-2. Traefik endpoint contract unvalidated. The load balancer healthcheck points at `/health` and the server port is `${PORT}` (default 8088), while the earlier baseline mapped host 8088 to container 80. Confirm what port image 0.105.0 actually listens on inside the container and that it serves `/health`; adjust `PORT` or the label if the container port differs.
-3. Docker container `healthcheck:` is still not declared for `doco-cd`. The Traefik load balancer healthcheck label is present, so this is a task-level visibility nicety, not a routing blocker.
+1. Deferred `anitrend-edge` healthcheck. `on-the-edge/docker-compose.yaml:19-24` keeps the Docker healthcheck commented out because the endpoint currently requires default headers. `stacks/platform.yml:198-215` is synchronized and intentionally has no corresponding healthcheck. Fix the header contract separately before re-enabling it, then regenerate the stack output with `./stackctl.sh generate`.
+2. Traefik endpoint contract unvalidated. The Doco-CD load balancer healthcheck points at `/health` and the server port is `${PORT}` (default 8088), while the earlier baseline mapped host 8088 to container 80. Confirm what port image 0.105.0 actually listens on inside the container and that it serves `/health`; adjust `PORT` or the label if the container port differs.
+3. Docker container `healthcheck:` is still not declared for Doco-CD. The Traefik load balancer healthcheck label is present, so this is a task-level visibility nicety, not a routing blocker.
 4. `.env` must exist for `env_file: .env` to have effect, and only `POLL_CONFIG` is set in `environment:`; `TZ`, `WEBHOOK_SECRET_FILE`, and `API_SECRET_FILE` from `doco-cd/.env.example:7-17` are wired only if the operator creates `.env` from the example. `TRAEFIK_ENABLE=false` in the example also means the router stays disabled unless explicitly enabled.
 5. Secret bootstrap caveat (unchanged): `doco-cd/docker-compose.yml:37-41` reads `./secrets/webhook_secret` and `./secrets/api_secret` from the local filesystem at deploy time, and `doco-cd/.gitignore` excludes `secrets/`. This works for the current single-node setup but is separate from the `./stackctl.sh secrets deploy` SOPS flow used by stack services; see `docs/Managing Secrets.md`.
 
@@ -84,4 +84,4 @@ Severity under this model:
 4. Should `.env` be created from `.env.example` now that `env_file: .env` is declared, and should `TZ` and the secret file env vars stay operator-managed?
 5. Keep Doco-CD stack-managed, or revert to a host-level bootstrap controller?
 6. Should Doco-CD bootstrap secrets remain local Docker secret files, or later join the SOPS workflow after the bootstrap model is settled?
-7. Regenerate and commit `stacks/platform.yml` with `./stackctl.sh generate` to clear the `anitrend-edge` healthcheck drift, as a separate generated-output sync fix.
+7. After the default-header contract is fixed, decide whether to re-enable the `anitrend-edge` healthcheck in `on-the-edge/docker-compose.yaml:19-24`, then run `./stackctl.sh generate`; do not hand-edit `stacks/`.
