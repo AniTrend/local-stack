@@ -32,6 +32,7 @@ APPROVE_ALLOWED_UPDATE_TYPES = frozenset({"semver-patch", "semver-minor", "diges
 APPROVE_ALLOWED_CONFIDENCE = frozenset({"high", "medium"})
 
 SENSITIVE_FILE_PATTERNS = (
+    ".stackctl",
     ".env.enc",
     ".sops.yaml",
     "stackctl.sh",

@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# DEPRECATION / COMPATIBILITY NOTICE
+# The standalone `stackctl` CLI (see the committed `.stackctl` config at the
+# repository root) is the preferred interface for this repo. This script is
+# retained as a compatibility path for runtimes that cannot install the CLI
+# yet, most notably the Doco-CD Linux deploy container (deploy/doco/
+# local-stack-deployer), and for the validated Python-based generate/render
+# pipeline that still produces the committed stacks/ output.
+# Behavior is intentionally unchanged in this phase.
+
 # Safe/strict shell settings
 set -euo pipefail
 IFS=$'\n\t'

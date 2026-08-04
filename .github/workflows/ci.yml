@@ -48,6 +48,13 @@ jobs:
     needs: [lint]
     name: Validate stack
     runs-on: ubuntu-latest
+    # NOTE: stack validation intentionally keeps the Python toolchain
+    # (tools/generate_stacks.py + stackctl.sh) rather than the `stackctl` CLI.
+    # The live CLI's generated output is not yet byte-equivalent to the
+    # committed stacks/ files (env_file/bind-mount path rewriting, volume
+    # `name:` keys, and YAML serialization differ), and CLI installation on
+    # this runner is not verified. Migrate this job once output parity and an
+    # explicit install step are proven. Do not weaken drift or dry-run checks.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -73,7 +80,7 @@ jobs:
           done
           if [ "$drift" -eq 1 ]; then
             echo ""
-            echo "Run './stackctl.sh generate' and commit the result."
+            echo "Run 'stackctl generate' (or './stackctl.sh generate' on the compatibility path) and commit the result."
             exit 1
           fi
       - name: Dry-run stack rendering

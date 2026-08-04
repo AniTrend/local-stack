@@ -2,6 +2,13 @@
 
 One-shot deployment runner invoked by Doco-CD. Fetches the repository, runs pre-deployment checks, and deploys Swarm stacks via `stackctl.sh`.
 
+> **Compatibility path note:** this runner intentionally uses `./stackctl.sh`
+> (the repository-root compatibility wrapper), not the `stackctl` CLI, because
+> the runner's Linux image does not yet have a verified CLI installation.
+> The `stackctl` CLI is the preferred interface elsewhere in this repo; revisit
+> this runner once the Linux image ships an explicit, verified CLI install
+> path. The entrypoint behavior is unchanged in this phase.
+
 ## Environment Variables
 
 | Variable | Default | Description |
@@ -35,7 +42,7 @@ Doco-CD detects the revert and redeploys.
 cd /path/to/local-stack
 git fetch --prune origin dev
 git reset --hard <known_good_commit>
-./stackctl.sh secrets deploy
+stackctl secrets deploy        # preferred; fallback: ./stackctl.sh secrets deploy
 ```
 
 ## Cautions

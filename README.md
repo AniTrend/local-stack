@@ -5,7 +5,9 @@ A local development environment for the AniTrend stack, providing a complete inf
 > Swarm migration: This repository has migrated from multiple per-service Docker Compose files to modular Docker Swarm stacks located under `stacks/`.
 > Prefer the Swarm workflow for full environment deploys; per-service Compose remains for local iterative work.
 >
-> Quick start (Swarm): run `./stackctl.sh doctor --fix-network && ./stackctl.sh up`.  See `stacks/README.md` for the full runbook.
+> Interface: the `stackctl` CLI (configured by the committed `.stackctl`) is the preferred interface. Root `./stackctl.sh` remains as a compatibility fallback for runtimes that cannot install the CLI, most notably the Doco-CD Linux deploy container.
+>
+> Quick start (Swarm): run `stackctl doctor && stackctl up` (requires Docker Swarm enabled).  See `stacks/README.md` for the full runbook. To auto-create the overlay network, use the compatibility path `./stackctl.sh doctor --fix-network` (the CLI's `doctor` has no `--fix-network` option).
 
 ## Stack Components
 
@@ -192,12 +194,20 @@ cd local-stack
 
 ```bash
 # Single-command deploy with preflight checks, rendering, and log following
-./stackctl.sh doctor --fix-network
-./stackctl.sh up
+stackctl doctor
+stackctl up
 ```
 
-See `stacks/README.md` for the complete runbook, stack selection, encrypted
-secrets workflow, rendered output, and troubleshooting.
+`stackctl` is the preferred interface. On runtimes without the CLI (for
+example the Doco-CD Linux container), the equivalent compatibility path is
+`./stackctl.sh doctor --fix-network && ./stackctl.sh up`. Network creation is
+the compatibility script's `--fix-network` feature only; the CLI's `doctor`
+does not support that option.
+
+`stackctl generate` (re)generates `stacks/` from the per-service Compose
+sources; `stackctl sync` is drift validation only and never generates or
+deploys. See `stacks/README.md` for the complete runbook, stack selection,
+encrypted secrets workflow, rendered output, and troubleshooting.
 
 ### 3. Set up individual services (Compose - for local iterative work)
 
@@ -206,9 +216,12 @@ repo's safe env helper to create `.env` files from examples (skips existing
 files; use `--force` to overwrite with backup):
 
 ```bash
-./stackctl.sh env --list          # see which .env files exist or are missing
-./stackctl.sh env --recreate      # create missing .env files from .env.example
+stackctl env list              # see which .env files exist or are missing
+stackctl env create            # create missing .env files from .env.example
 ```
+
+Compatibility path (same safeguards): `./stackctl.sh env --list` and
+`./stackctl.sh env --recreate`.
 
 Then start a service in its directory (e.g., `cd traefik && docker compose up -d`).
 
@@ -248,15 +261,19 @@ Dependency updates on `dev` are gated through Renovate, OpenCode risk review, br
 ### Flow
 
 ```
-Renovate PR → OpenCode risk gate → CI validation → approved merge → Doco-CD detects change on dev → deploys via stackctl.sh
+Renovate PR → OpenCode risk gate → CI validation → approved merge → Doco-CD detects change on dev → deploys via the stackctl.sh compatibility wrapper
 ```
+
+The Doco-CD runner keeps the `stackctl.sh` compatibility path because its Linux
+container does not yet have a verified `stackctl` CLI installation. The CLI is
+the preferred interface everywhere else.
 
 Patch/minor Docker image updates may auto-merge after validation passes and OpenCode classifies them as low risk. Major updates, stateful service updates (postgres, mongo, redis, etcd, grafana, prometheus, loki, tempo, portainer, growthbook), and unknown-risk updates require manual promotion.
 
 ### Components
 
 - `doco-cd/`: Host-level bootstrap for the Doco-CD deployment controller. Deploy manually first.
-- `deploy/doco/local-stack-deployer/`: One-shot runner that fetches the repo, runs `stackctl.sh`, and deploys Swarm stacks.
+- `deploy/doco/local-stack-deployer/`: One-shot runner that fetches the repo, runs the `stackctl.sh` compatibility path, and deploys Swarm stacks.
 - `.doco-cd.yml`: Root config telling Doco-CD which compose files to deploy and how to trigger.
 - `.github/renovate.json`: Weekly Docker and GitHub Actions dependency updates grouped by risk.
 - `.github/workflows/renovate-opencode-gate.yml`: OpenCode-based risk classifier for Renovate PRs.
@@ -268,18 +285,22 @@ See `doco-cd/README.md` for bootstrap instructions and `deploy/doco/local-stack-
 Each component has its own environment file for configuration. For local development without secrets management, use the safe env helper:
 
 ```sh
-./stackctl.sh env --list        # see which .env files exist or are missing
-./stackctl.sh env --recreate    # create missing .env files from .env.example
+stackctl env list        # see which .env files exist or are missing
+stackctl env create      # create missing .env files from .env.example
 ```
+
+Compatibility path: `./stackctl.sh env --list` and `./stackctl.sh env --recreate`.
 
 For production or shared environments, use the SOPS + age secrets workflow (see [Managing Secrets](docs/Managing%20Secrets.md)):
 
 ```sh
 # Decrypt and deploy in one step
-./stackctl.sh secrets deploy
+stackctl secrets deploy
 
 # Or decrypt manually for inspection
-./stackctl.sh secrets decrypt
+stackctl secrets decrypt
+
+# Compatibility path (e.g., Doco-CD runtime): ./stackctl.sh secrets deploy
 ```
 
 ## License

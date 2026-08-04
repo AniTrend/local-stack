@@ -16,5 +16,9 @@ __pycache__/
 # Deepwork session tracking
 .slim/deepwork/
 
+# stackctl local config overrides (never commit machine-local settings)
+.stackctl.local
+.stackctl.local.*
+
 # Doco-CD bootstrap secrets
 doco-cd/secrets/
