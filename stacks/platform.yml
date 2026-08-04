@@ -11,7 +11,7 @@ networks:
     external: true
 services:
   doco-cd:
-    image: ghcr.io/kimdre/doco-cd:0.105.0
+    image: ghcr.io/kimdre/doco-cd:0.105.1
     networks:
       default:
         aliases:
