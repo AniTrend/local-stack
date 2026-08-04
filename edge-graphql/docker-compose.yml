@@ -2,7 +2,7 @@
 x-stack: platform
 services:
   edge-graphql:
-    image: ghcr.io/anitrend/edge-graphql:0.1.13
+    image: ghcr.io/anitrend/edge-graphql:0.1.14
     container_name: edge-graphql
     networks:
       - default
