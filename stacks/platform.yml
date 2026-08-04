@@ -55,7 +55,7 @@ services:
           memory: 384M
           cpus: '0.50'
   edge-graphql:
-    image: ghcr.io/anitrend/edge-graphql:0.1.13
+    image: ghcr.io/anitrend/edge-graphql:0.1.14
     networks:
       default:
         aliases:
