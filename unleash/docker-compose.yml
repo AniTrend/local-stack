@@ -3,7 +3,7 @@ x-stack: platform
 services:
   unleash:
     container_name: "unleash"
-    image: "unleashorg/unleash-server:8.0"
+    image: "unleashorg/unleash-server:8.1"
     env_file: .env
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
