@@ -78,32 +78,19 @@ stackctl secrets deploy
 
 `./stackctl.sh` is retained as the compatibility fallback for runtimes that
 cannot install the CLI yet, most notably the Doco-CD Linux deploy container
-(see `../deploy/doco/local-stack-deployer/`), and for the Python-based
-generate/render pipeline that still produces the committed `stacks/` output.
-It handles preflight checks, stack regeneration, variable rendering, and
-deployment in one workflow. `stackctl.sh` calls `tools/render_compose.py` to
-substitute service-local `env_file` values into a gitignored `.rendered/`
-copy, then deploys the rendered file.
+(see `../deploy/doco/local-stack-deployer/`), and for the existing
+Python-based render/dry-run path. It handles preflight checks, stack
+regeneration, variable rendering, and deployment in one workflow.
+`stackctl.sh` calls `tools/render_compose.py` to substitute service-local
+`env_file` values into a gitignored `.rendered/` copy, then deploys the
+rendered file.
 
-> Parity status: the live CLI's generated output is not yet byte-equivalent to
-> the committed `stacks/` files produced by `tools/generate_stacks.py`
-> (env_file/bind-mount path rewriting, volume `name:` keys, and YAML
-> serialization differ). Until parity is proven, CI drift validation and
-> nightly regeneration keep the Python toolchain and Doco-CD keeps the
-> `stackctl.sh` compatibility path.
->
-> **Retirement acceptance criteria (not yet met):** `stackctl.sh` and the
-> Python generate/render fallback (`tools/generate_stacks.py`,
-> `tools/render_compose.py`) may be retired only after all of the following
-> gates pass:
-> 1. CLI and Python generation both run into separate temporary directories
->    for all three stacks, and the generated files diff clean recursively
->    (paths, volume `name:` keys, and serialization included).
-> 2. The `stackctl` CLI is explicitly installed and verified in the Doco-CD
->    Linux runtime and in CI runners.
-> 3. CI drift validation, nightly/renovate regeneration, and the Doco-CD
->    entrypoint migrate to `stackctl` only after gates 1-2 pass.
-> 4. The compatibility path remains in place until all gates pass.
+> Parity status: `stackctl` is now the generator used by CI drift validation,
+> nightly stack synchronization, and Renovate stack synchronization.
+> `stackctl.sh` remains the compatibility fallback for the Doco-CD Linux
+> deploy container (see `../deploy/doco/local-stack-deployer/`) and for the
+> existing Python-based render/dry-run path. Doco-CD has not migrated to
+> `stackctl`; its deploy runner still uses `stackctl.sh`.
 
 Compatibility quick start:
 

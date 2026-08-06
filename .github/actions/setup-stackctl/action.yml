@@ -1,0 +1,77 @@
+name: Setup stackctl
+description: >-
+  Install the stackctl CLI on Linux x86_64 runners, verify the archive against
+  a pinned SHA-256 checksum, and add it to PATH.
+
+inputs:
+  version:
+    description: 'stackctl release version to install (e.g. v0.2.4)'
+    # renovate: datasource=github-releases depName=AniTrend/stackctl versioning=semver-coerced
+    default: 'v0.2.4'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate runner platform
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ "${RUNNER_OS:-}" != "Linux" ]]; then
+          echo "::error::setup-stackctl supports Linux x86_64 runners only; detected RUNNER_OS='${RUNNER_OS:-<unset>}'."
+          exit 1
+        fi
+        case "${RUNNER_ARCH:-}" in
+          X64|x64|AMD64|amd64|x86_64) ;;
+          *)
+            echo "::error::setup-stackctl supports x86_64 runners only; detected RUNNER_ARCH='${RUNNER_ARCH:-<unset>}'."
+            exit 1
+            ;;
+        esac
+
+    - name: Install stackctl
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        STACKCTL_VERSION="${{ inputs.version }}"
+        TARGET_TRIPLE="x86_64-unknown-linux-gnu"
+        ASSET="stackctl-${STACKCTL_VERSION}-${TARGET_TRIPLE}.tar.gz"
+        # Pinned SHA-256 for stackctl-v0.2.4-x86_64-unknown-linux-gnu.tar.gz.
+        # This is the only integrity check: the release checksums file is
+        # mutable and is never fetched. If the version is bumped, this pinned
+        # hash no longer matches and verification fails instead of silently
+        # installing an unverified binary.
+        EXPECTED_SHA256="14bcc38d5da6fc5cc94aa95de97891e67a3048278867adc96ac4892c8335e960"
+
+        if [[ ! "${STACKCTL_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Unsupported stackctl version '${STACKCTL_VERSION}': expected a semver tag with a leading 'v' (e.g. v0.2.4)."
+          exit 1
+        fi
+
+        tmp_dir="$(mktemp -d)"
+        trap 'rm -rf "${tmp_dir}"' EXIT
+
+        url="https://github.com/AniTrend/stackctl/releases/download/${STACKCTL_VERSION}/${ASSET}"
+        if ! curl -fsSL -o "${tmp_dir}/${ASSET}" "${url}"; then
+          echo "::error::Failed to download '${ASSET}' from ${url}. The release archive may be missing."
+          exit 1
+        fi
+
+        printf '%s  %s\n' "${EXPECTED_SHA256}" "${tmp_dir}/${ASSET}" > "${tmp_dir}/stackctl.sha256"
+        if ! sha256sum -c "${tmp_dir}/stackctl.sha256"; then
+          echo "::error::Checksum mismatch for '${ASSET}': expected ${EXPECTED_SHA256} (pinned for v0.2.4). If the version was updated, the pinned checksum must be updated too; the unverified binary will not be installed."
+          exit 1
+        fi
+
+        install_dir="${RUNNER_TEMP}/setup-stackctl/${STACKCTL_VERSION}"
+        mkdir -p "${install_dir}"
+        tar -xzf "${tmp_dir}/${ASSET}" -C "${install_dir}"
+
+        if [[ ! -x "${install_dir}/stackctl" ]]; then
+          echo "::error::Ambiguous install state: 'stackctl' binary not found or not executable in '${install_dir}' after extracting '${ASSET}'."
+          exit 1
+        fi
+
+        echo "${install_dir}" >> "${GITHUB_PATH}"
+        export PATH="${install_dir}:${PATH}"
+        stackctl --version

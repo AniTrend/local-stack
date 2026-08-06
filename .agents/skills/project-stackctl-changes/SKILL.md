@@ -19,10 +19,9 @@ configured by the committed `.stackctl` file at the repository root (project
 
 The root `stackctl.sh` script is a **compatibility fallback**, not the primary
 interface. It is retained for runtimes that cannot install the CLI, most
-notably the Doco-CD Linux deploy container, and for the Python-based
-generate/render pipeline that still produces the committed `stacks/` output.
-Do not delete it, and do not rewrite its behavior without a separate migration
-decision.
+notably the Doco-CD Linux deploy container, and for the existing Python-based
+render/dry-run path. Do not delete it, and do not rewrite its behavior without
+a separate migration decision.
 
 ## When to Use
 
@@ -61,14 +60,14 @@ decision.
 | `doctor` | Validate environment, network, and compose syntax |
 | `env` | List or recreate `.env` files from examples with safeguards and a summary report |
 
-## Known Parity Status
+## Generator Status
 
-The live CLI's generated output is not yet byte-equivalent to the committed
-`stacks/` files produced by `tools/generate_stacks.py` (env_file/bind-mount
-path rewriting, volume `name:` keys, YAML serialization differ). Until parity
-is proven, CI drift validation and nightly regeneration keep the Python
-toolchain, and Doco-CD keeps the `stackctl.sh` compatibility path. Do not
-claim CLI/deploy parity in docs or automation without verification.
+`stackctl` is the generator used by CI drift validation, nightly stack
+synchronization, and Renovate stack synchronization. The `stackctl.sh`
+compatibility path remains for the Doco-CD Linux deploy container, which has
+not migrated to `stackctl`, and for the existing Python-based render/dry-run
+path. Do not claim Doco-CD has migrated to `stackctl` in docs or automation
+without verification.
 
 ## Validation
 

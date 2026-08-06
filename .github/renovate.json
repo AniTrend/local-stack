@@ -3,6 +3,17 @@
   "extends": [
     "config:recommended"
   ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "^\\.github/actions/setup-stackctl/action\\.yml$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>[^\\s]+) versioning=(?<versioning>semver-coerced)\\s+default:\\s*['\"](?<currentValue>v[^'\"]+)['\"]"
+      ]
+    }
+  ],
   "addLabels": [
     ":dagger: dependencies"
   ],
