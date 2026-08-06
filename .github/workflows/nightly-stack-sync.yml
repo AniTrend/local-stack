@@ -29,25 +29,8 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Install stackctl CLI
-        run: |
-          set -euo pipefail
-          # renovate: datasource=github-releases depName=AniTrend/stackctl versioning=semver-coerced
-          STACKCTL_VERSION="v0.2.4"
-          TARGET_TRIPLE="x86_64-unknown-linux-gnu"
-          ASSET="stackctl-${STACKCTL_VERSION}-${TARGET_TRIPLE}.tar.gz"
-          INSTALL_DIR="${RUNNER_TOOL_CACHE}/stackctl/${STACKCTL_VERSION}"
-          mkdir -p "${INSTALL_DIR}"
-          curl -fsSL -o "/tmp/${ASSET}" \
-            "https://github.com/AniTrend/stackctl/releases/download/${STACKCTL_VERSION}/${ASSET}"
-          curl -fsSL -o /tmp/stackctl-checksums.txt \
-            "https://github.com/AniTrend/stackctl/releases/download/${STACKCTL_VERSION}/checksums.txt"
-          grep -E " ${ASSET}\$" /tmp/stackctl-checksums.txt > /tmp/stackctl.sha256
-          (cd /tmp && sha256sum -c stackctl.sha256)
-          tar -xzf "/tmp/${ASSET}" -C "${INSTALL_DIR}"
-          echo "${INSTALL_DIR}" >> "${GITHUB_PATH}"
-          export PATH="${INSTALL_DIR}:${PATH}"
-          stackctl --version
+      - name: Setup stackctl CLI
+        uses: ./.github/actions/setup-stackctl
 
       - name: Install yq
         run: |

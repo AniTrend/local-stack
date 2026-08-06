@@ -12,13 +12,6 @@ jobs:
     name: Regenerate stacks for Renovate PRs
     if: contains(github.event.pull_request.user.login, 'renovate') && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    # NOTE: regeneration intentionally keeps the Python toolchain
-    # (tools/generate_stacks.py) rather than the `stackctl` CLI. The live CLI's
-    # generated output is not yet byte-equivalent to the committed stacks/
-    # files (env_file/bind-mount path rewriting, volume `name:` keys, and YAML
-    # serialization differ), so a CLI-based regeneration would rewrite stacks
-    # with incorrect service paths. Migrate once output parity and an explicit
-    # CLI install step are proven.
     steps:
       - name: Generate app token
         uses: actions/create-github-app-token@v3
@@ -34,16 +27,11 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.x'
-
-      - name: Install Python deps
-        run: pip install -r tools/requirements.txt
+      - name: Setup stackctl CLI
+        uses: ./.github/actions/setup-stackctl
 
       - name: Regenerate stacks
-        run: python3 tools/generate_stacks.py
+        run: stackctl generate
 
       - name: Commit regenerated stacks when drift exists
         uses: stefanzweifel/git-auto-commit-action@v7

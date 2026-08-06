@@ -7,10 +7,10 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "^\\.github/workflows/nightly-stack-sync\\.yml$"
+        "^\\.github/actions/setup-stackctl/action\\.yml$"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>[^\\s]+) versioning=(?<versioning>semver-coerced)\\s+STACKCTL_VERSION=\"(?<currentValue>v[^\"\\s]+)\""
+        "# renovate: datasource=(?<datasource>github-releases) depName=(?<depName>[^\\s]+) versioning=(?<versioning>semver-coerced)\\s+default:\\s*['\"](?<currentValue>v[^'\"]+)['\"]"
       ]
     }
   ],
