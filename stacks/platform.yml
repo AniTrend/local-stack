@@ -39,6 +39,43 @@ services:
         delay: 10s
         max_attempts: 10
         window: 180s
+  anitrend-edge:
+    image: 'ghcr.io/anitrend/on-the-edge:1.6.5'
+    networks:
+      default:
+        aliases:
+          - anitrend-edge
+    env_file: ./on-the-edge/.env
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.anitrend-edge.rule=Host(`${HOST}`)'
+      - 'traefik.http.routers.anitrend-edge.entrypoints=web,websecure'
+      - traefik.http.routers.anitrend-edge.service=anitrend-edge
+      - traefik.http.routers.anitrend-edge.tls=true
+      - 'traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}'
+      - 'traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}'
+    logging:
+      options:
+        max-size: 10m
+        max-file: 3
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 128M
+          cpus: '0.10'
+        limits:
+          memory: 384M
+          cpus: '0.50'
+      restart_policy:
+        condition: any
+        delay: 10s
+        max_attempts: 10
+        window: 180s
   website:
     image: 'ghcr.io/anitrend/website:0.4.2'
     networks:
@@ -70,53 +107,6 @@ services:
       options:
         max-size: 10m
         max-file: 3
-  growthbook_proxy:
-    image: 'growthbook/proxy:v1.3.5'
-    env_file: ./growthbook/proxy/.env
-    networks:
-      default:
-        aliases:
-          - growthbook-proxy
-    labels:
-      - 'traefik.enable=${TRAEFIK_ENABLE}'
-      - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
-      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
-      - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
-      - traefik.http.routers.growth-proxy.service=growth-proxy
-      - traefik.http.routers.growth-proxy.tls=true
-      - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
-    logging:
-      options:
-        max-size: 10m
-        max-file: 3
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - |-
-          node -e "fetch('http://127.0.0.1:3300/healthcheck')
-            .then(r => r.json())
-            .then(d => process.exit(d.ok ? 0 : 1))
-            .catch(() => process.exit(1))"
-      interval: 20s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      resources:
-        reservations:
-          memory: 64M
-        limits:
-          memory: 256M
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 10
-        window: 180s
   growthbook:
     command:
       - yarn
@@ -176,25 +166,37 @@ services:
         delay: 10s
         max_attempts: 10
         window: 180s
-  anitrend-edge:
-    image: 'ghcr.io/anitrend/on-the-edge:1.6.5'
+  growthbook_proxy:
+    image: 'growthbook/proxy:v1.3.5'
+    env_file: ./growthbook/proxy/.env
     networks:
       default:
         aliases:
-          - anitrend-edge
-    env_file: ./on-the-edge/.env
+          - growthbook-proxy
     labels:
       - 'traefik.enable=${TRAEFIK_ENABLE}'
-      - 'traefik.http.routers.anitrend-edge.rule=Host(`${HOST}`)'
-      - 'traefik.http.routers.anitrend-edge.entrypoints=web,websecure'
-      - traefik.http.routers.anitrend-edge.service=anitrend-edge
-      - traefik.http.routers.anitrend-edge.tls=true
-      - 'traefik.http.routers.anitrend-edge.tls.certresolver=${CERT_RESOLVER}'
-      - 'traefik.http.services.anitrend-edge.loadbalancer.server.port=${PORT}'
+      - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
+      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
+      - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
+      - traefik.http.routers.growth-proxy.service=growth-proxy
+      - traefik.http.routers.growth-proxy.tls=true
+      - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
     logging:
       options:
         max-size: 10m
         max-file: 3
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - |-
+          node -e "fetch('http://127.0.0.1:3300/healthcheck')
+            .then(r => r.json())
+            .then(d => process.exit(d.ok ? 0 : 1))
+            .catch(() => process.exit(1))"
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     deploy:
       mode: replicated
       replicas: 1
@@ -203,13 +205,11 @@ services:
           - node.role == manager
       resources:
         reservations:
-          memory: 128M
-          cpus: '0.10'
+          memory: 64M
         limits:
-          memory: 384M
-          cpus: '0.50'
+          memory: 256M
       restart_policy:
-        condition: any
+        condition: on-failure
         delay: 10s
         max_attempts: 10
         window: 180s

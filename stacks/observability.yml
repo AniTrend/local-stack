@@ -101,54 +101,6 @@ services:
         limits:
           memory: 384M
           cpus: '0.40'
-  memcached:
-    image: 'memcached:1.6.45'
-    environment:
-      - MEMCACHED_MAX_MEMORY=64m
-      - MEMCACHED_THREADS=2
-    networks:
-      default:
-        aliases:
-          - memcached
-    logging:
-      options:
-        max-size: 10m
-        max-file: 3
-  tempo:
-    image: 'grafana/tempo:3.0.2'
-    user: tempo
-    command:
-      - '-config.file=/etc/tempo/config.yaml'
-    volumes:
-      - './observability/tempo/tempo.yaml:/etc/tempo/config.yaml'
-      - 'tempo-data:/var/tempo'
-    environment:
-      - TEMPO_GID=10001
-      - TEMPO_UID=10001
-    env_file: ./observability/tempo/.env
-    networks:
-      default:
-        aliases:
-          - tempo
-    logging:
-      options:
-        max-size: 10m
-        max-file: 3
-    depends_on:
-      - memcached
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      restart_policy:
-        condition: any
-      resources:
-        reservations:
-          memory: 256M
-        limits:
-          memory: 600M
   prometheus:
     image: 'prom/prometheus:v3.13.2'
     command:
@@ -202,6 +154,54 @@ services:
         limits:
           memory: 1200M
           cpus: '0.80'
+  memcached:
+    image: 'memcached:1.6.45'
+    environment:
+      - MEMCACHED_MAX_MEMORY=64m
+      - MEMCACHED_THREADS=2
+    networks:
+      default:
+        aliases:
+          - memcached
+    logging:
+      options:
+        max-size: 10m
+        max-file: 3
+  tempo:
+    image: 'grafana/tempo:3.0.2'
+    user: tempo
+    command:
+      - '-config.file=/etc/tempo/config.yaml'
+    volumes:
+      - './observability/tempo/tempo.yaml:/etc/tempo/config.yaml'
+      - 'tempo-data:/var/tempo'
+    environment:
+      - TEMPO_GID=10001
+      - TEMPO_UID=10001
+    env_file: ./observability/tempo/.env
+    networks:
+      default:
+        aliases:
+          - tempo
+    logging:
+      options:
+        max-size: 10m
+        max-file: 3
+    depends_on:
+      - memcached
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+      resources:
+        reservations:
+          memory: 256M
+        limits:
+          memory: 600M
   beszel:
     image: 'henrygd/beszel:0.18.7'
     networks:
