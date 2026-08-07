@@ -62,7 +62,7 @@ jobs:
         run: stackctl generate --output-dir /tmp/stacks-check
       - name: Upload Linux stack artifacts for parity inspection
         if: github.head_ref == 'chore/nightly-stack-sync-stackctl'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-generated-stacks
           path: /tmp/stacks-check/*.yml
