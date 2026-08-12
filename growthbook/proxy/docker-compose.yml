@@ -3,7 +3,7 @@ x-stack: platform
 services:
   growthbook_proxy:
     container_name: "growthbook-proxy"
-    image: growthbook/proxy:v1.3.5
+    image: growthbook/proxy:v1.4.0
     env_file: .env
     networks:
       - default
