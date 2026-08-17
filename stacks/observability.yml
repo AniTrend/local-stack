@@ -203,7 +203,7 @@ services:
         limits:
           memory: 800M
   beszel:
-    image: 'henrygd/beszel:0.18.7'
+    image: 'henrygd/beszel:0.18.8'
     networks:
       default:
         aliases:
