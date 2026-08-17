@@ -237,7 +237,7 @@ services:
         limits:
           memory: 256M
   beszel-agent:
-    image: 'henrygd/beszel-agent:0.18.7'
+    image: 'henrygd/beszel-agent:0.18.8'
     networks:
       default:
         aliases:
