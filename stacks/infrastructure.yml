@@ -82,7 +82,7 @@ services:
         max_attempts: 0
         window: 120s
   apisix_gateway:
-    image: 'apache/apisix:3.17.0-debian'
+    image: 'apache/apisix:3.18.0-debian'
     networks:
       default:
         aliases:
