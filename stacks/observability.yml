@@ -67,7 +67,7 @@ services:
         limits:
           memory: 800M
   prometheus:
-    image: 'prom/prometheus:v3.13.2'
+    image: 'prom/prometheus:v3.14.0'
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
