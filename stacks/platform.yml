@@ -177,7 +177,7 @@ services:
         max_attempts: 10
         window: 180s
   anitrend-edge:
-    image: 'ghcr.io/anitrend/on-the-edge:1.6.6'
+    image: 'ghcr.io/anitrend/on-the-edge:1.7.0'
     networks:
       default:
         aliases:
