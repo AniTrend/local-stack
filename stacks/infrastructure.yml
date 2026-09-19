@@ -175,7 +175,7 @@ services:
           memory: 512M
           cpus: '0.50'
   mongo:
-    image: 'mongo:8.3.8'
+    image: 'mongo:8.3.11'
     networks:
       default:
         aliases:
