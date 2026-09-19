@@ -259,7 +259,7 @@ services:
         max_attempts: 0
         window: 120s
   portainer:
-    image: 'portainer/portainer-ce:2.44.0'
+    image: 'portainer/portainer-ce:2.45.1'
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
       - 'portainer-data:/data'
