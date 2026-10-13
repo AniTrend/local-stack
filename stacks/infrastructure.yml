@@ -39,39 +39,6 @@ services:
         delay: 5s
         max_attempts: 0
         window: 120s
-  etcd:
-    image: 'bitnamilegacy/etcd:3.6.4'
-    networks:
-      default:
-        aliases:
-          - apisix-etcd
-    env_file:
-      - ./apisix/etcd/.env
-    volumes:
-      - 'etcd-data:/bitnami/etcd'
-    logging:
-      options:
-        max-size: 10m
-        max-file: 3
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'etcdctl endpoint health 2>/dev/null || curl -sf http://localhost:2379/health'
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    deploy:
-      resources:
-        reservations:
-          memory: 64M
-        limits:
-          memory: 256M
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 0
-        window: 120s
   apisix_dashboard:
     image: 'apache/apisix-dashboard:3.0.1-alpine'
     networks:
@@ -120,6 +87,39 @@ services:
         delay: 10s
         max_attempts: 10
         window: 180s
+  etcd:
+    image: 'bitnamilegacy/etcd:3.6.4'
+    networks:
+      default:
+        aliases:
+          - apisix-etcd
+    env_file:
+      - ./apisix/etcd/.env
+    volumes:
+      - 'etcd-data:/bitnami/etcd'
+    logging:
+      options:
+        max-size: 10m
+        max-file: 3
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'etcdctl endpoint health 2>/dev/null || curl -sf http://localhost:2379/health'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
   apisix_gateway:
     image: 'apache/apisix:3.18.0-debian'
     networks:
@@ -167,6 +167,51 @@ services:
         delay: 10s
         max_attempts: 10
         window: 180s
+  mongo:
+    image: 'mongo:8.3.11'
+    networks:
+      default:
+        aliases:
+          - mongo
+    env_file:
+      - ./mongo/.env
+    environment:
+      - GLIBC_TUNABLES=glibc.pthread.rseq=1
+    volumes:
+      - 'mongo-data:/data/db'
+      - 'mongo-data:/data/configdb'
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)'
+      - traefik.tcp.routers.mongo.entrypoints=websecure
+      - traefik.tcp.routers.mongo.service=mongo
+      - traefik.tcp.routers.mongo.tls=true
+      - 'traefik.tcp.routers.mongo.tls.certresolver=${CERT_RESOLVER}'
+      - 'traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mongosh --quiet --eval "db.runCommand({ping:1}).ok ? quit(0) : quit(1)"'
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+        limits:
+          memory: 800M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: 3
   portainer:
     image: 'portainer/portainer-ce:2.45.2'
     volumes:
@@ -249,51 +294,6 @@ services:
         limits:
           memory: 512M
           cpus: '0.50'
-  mongo:
-    image: 'mongo:8.3.11'
-    networks:
-      default:
-        aliases:
-          - mongo
-    env_file:
-      - ./mongo/.env
-    environment:
-      - GLIBC_TUNABLES=glibc.pthread.rseq=1
-    volumes:
-      - 'mongo-data:/data/db'
-      - 'mongo-data:/data/configdb'
-    labels:
-      - 'traefik.enable=${TRAEFIK_ENABLE}'
-      - 'traefik.tcp.routers.mongo.rule=HostSNI(`${HOST}`)'
-      - traefik.tcp.routers.mongo.entrypoints=websecure
-      - traefik.tcp.routers.mongo.service=mongo
-      - traefik.tcp.routers.mongo.tls=true
-      - 'traefik.tcp.routers.mongo.tls.certresolver=${CERT_RESOLVER}'
-      - 'traefik.tcp.services.mongo.loadbalancer.server.port=${PORT}'
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'mongosh --quiet --eval "db.runCommand({ping:1}).ok ? quit(0) : quit(1)"'
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-    deploy:
-      resources:
-        reservations:
-          memory: 256M
-        limits:
-          memory: 800M
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 0
-        window: 120s
-    logging:
-      driver: local
-      options:
-        max-size: 10m
-        max-file: 3
 networks:
   default:
     name: traefik-public
