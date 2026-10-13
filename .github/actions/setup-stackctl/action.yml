@@ -5,9 +5,9 @@ description: >-
 
 inputs:
   version:
-    description: 'stackctl release version to install (e.g. v0.2.4)'
+    description: 'stackctl release version to install (e.g. v0.4.0)'
     # renovate: datasource=github-releases depName=AniTrend/stackctl versioning=semver-coerced
-    default: 'v0.2.4'
+    default: 'v0.4.0'
 
 runs:
   using: composite
@@ -36,15 +36,15 @@ runs:
         STACKCTL_VERSION="${{ inputs.version }}"
         TARGET_TRIPLE="x86_64-unknown-linux-gnu"
         ASSET="stackctl-${STACKCTL_VERSION}-${TARGET_TRIPLE}.tar.gz"
-        # Pinned SHA-256 for stackctl-v0.2.4-x86_64-unknown-linux-gnu.tar.gz.
+        # Pinned SHA-256 for stackctl-v0.4.0-x86_64-unknown-linux-gnu.tar.gz.
         # This is the only integrity check: the release checksums file is
         # mutable and is never fetched. If the version is bumped, this pinned
         # hash no longer matches and verification fails instead of silently
         # installing an unverified binary.
-        EXPECTED_SHA256="14bcc38d5da6fc5cc94aa95de97891e67a3048278867adc96ac4892c8335e960"
+        EXPECTED_SHA256="54dd24518e594f888743e55cfeb10cad0b06bc9279b2a1b0a4aee09dae210880"
 
         if [[ ! "${STACKCTL_VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "::error::Unsupported stackctl version '${STACKCTL_VERSION}': expected a semver tag with a leading 'v' (e.g. v0.2.4)."
+          echo "::error::Unsupported stackctl version '${STACKCTL_VERSION}': expected a semver tag with a leading 'v' (e.g. v0.4.0)."
           exit 1
         fi
 
@@ -59,7 +59,7 @@ runs:
 
         printf '%s  %s\n' "${EXPECTED_SHA256}" "${tmp_dir}/${ASSET}" > "${tmp_dir}/stackctl.sha256"
         if ! sha256sum -c "${tmp_dir}/stackctl.sha256"; then
-          echo "::error::Checksum mismatch for '${ASSET}': expected ${EXPECTED_SHA256} (pinned for v0.2.4). If the version was updated, the pinned checksum must be updated too; the unverified binary will not be installed."
+          echo "::error::Checksum mismatch for '${ASSET}': expected ${EXPECTED_SHA256} (pinned for v0.4.0). If the version was updated, the pinned checksum must be updated too; the unverified binary will not be installed."
           exit 1
         fi
 
@@ -74,4 +74,10 @@ runs:
 
         echo "${install_dir}" >> "${GITHUB_PATH}"
         export PATH="${install_dir}:${PATH}"
-        stackctl --version
+        installed_version="$(stackctl --version)"
+        expected_version="stackctl ${STACKCTL_VERSION#v}"
+        if [[ "${installed_version}" != "${expected_version}" ]]; then
+          echo "::error::Installed '${installed_version}', expected '${expected_version}'."
+          exit 1
+        fi
+        echo "${installed_version}"

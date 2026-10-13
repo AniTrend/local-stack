@@ -9,7 +9,7 @@ services:
     env_file: .env
     labels:
       - "traefik.enable=${TRAEFIK_ENABLE}"
-      - "traefik.http.routers.edge-graphql.rule=Host(`${HOST}`)"
+      - "traefik.http.routers.edge-graphql.rule=Host(`${TRAEFIK_HOST}`)"
       - "traefik.http.routers.edge-graphql.entrypoints=web,websecure"
       - "traefik.http.routers.edge-graphql.service=edge-graphql"
       - "traefik.http.routers.edge-graphql.tls=true"
