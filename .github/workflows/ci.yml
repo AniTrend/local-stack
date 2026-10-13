@@ -48,10 +48,8 @@ jobs:
     needs: [lint]
     name: Validate stack
     runs-on: ubuntu-latest
-    # NOTE: the Python toolchain is retained only for the
-    # `./stackctl.sh up --dry-run --no-logs` compatibility check below.
-    # Drift validation uses the `stackctl` CLI via `stackctl sync` (drift
-    # check only; it never generates or deploys) and exits 1 on drift.
+    # stackctl can emit service mappings in host filesystem traversal order.
+    # Compare parsed YAML so drift checks ignore mapping order but catch content changes.
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -72,7 +70,38 @@ jobs:
           python-version: '3.15'
       - name: Install render dependencies
         run: pip install -r tools/requirements.txt
+      - name: Generate stacks for semantic drift check
+        run: stackctl generate --output-dir /tmp/stacks-check
       - name: Check stacks are in sync with compose sources
-        run: stackctl sync
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+          import yaml
+
+          committed_dir = Path("stacks")
+          generated_dir = Path("/tmp/stacks-check")
+          committed = {path.name: path for path in committed_dir.glob("*.yml")}
+          generated = {path.name: path for path in generated_dir.glob("*.yml")}
+          if committed.keys() != generated.keys():
+              print("Generated stack file set differs from committed stacks.")
+              print(f"Missing generated: {sorted(committed.keys() - generated.keys())}")
+              print(f"Uncommitted generated: {sorted(generated.keys() - committed.keys())}")
+              sys.exit(1)
+
+          drifted = []
+          for name in sorted(committed):
+              with committed[name].open() as stream:
+                  committed_data = yaml.safe_load(stream)
+              with generated[name].open() as stream:
+                  generated_data = yaml.safe_load(stream)
+              if committed_data != generated_data:
+                  drifted.append(name)
+
+          if drifted:
+              print(f"Stack content drift detected: {', '.join(drifted)}")
+              sys.exit(1)
+          print("Stacks match generated configuration (mapping order ignored).")
+          PY
       - name: Dry-run stack rendering
         run: ./stackctl.sh up --dry-run --no-logs
