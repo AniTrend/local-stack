@@ -20,17 +20,19 @@ services:
       options:
         max-size: "10m"
         max-file: 3
-    # Image is node:22-slim (Debian) — no curl/wget/nc.
-    # Uses Node.js built-in fetch against /healthcheck (returns {"ok": true}).
+    # v1.4.0 image is shell-less (no /bin/sh, curl, wget, or nc) — the
+    # healthcheck must use exec form (CMD, not CMD-SHELL) and rely on Node.js
+    # built-in fetch against /healthcheck (returns {"ok": true}).
     healthcheck:
       test:
-        - CMD-SHELL
+        - CMD
+        - node
+        - '-e'
         - >-
-          node -e
-          "fetch('http://127.0.0.1:3300/healthcheck')
+          fetch('http://127.0.0.1:3300/healthcheck')
             .then(r => r.json())
             .then(d => process.exit(d.ok ? 0 : 1))
-            .catch(() => process.exit(1))"
+            .catch(() => process.exit(1))
       interval: 20s
       timeout: 10s
       retries: 3

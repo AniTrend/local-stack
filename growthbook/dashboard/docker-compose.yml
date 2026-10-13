@@ -8,7 +8,11 @@ volumes:
 services:
   growthbook:
     container_name: "growthbook"
-    command: ["yarn", "start:with-tracing"]
+    # GrowthBook >= 5.1 images are shell-less (no yarn/sh); the default CMD
+    # runs `node scripts/run-apps.js start ecosystem.config.js`. Tracing is
+    # enabled via TRACING_PROVIDER=opentelemetry (replaces `yarn start:with-tracing`).
+    environment:
+      - TRACING_PROVIDER=opentelemetry
     image: "growthbook/growthbook:5.1.0"
     volumes:
       - uploads:/usr/local/src/app/packages/back-end/uploads
