@@ -168,7 +168,7 @@ services:
         max_attempts: 10
         window: 180s
   mongo:
-    image: 'mongo:8.3.11'
+    image: 'mongo:8.3.13'
     networks:
       default:
         aliases:
