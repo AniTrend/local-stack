@@ -37,6 +37,113 @@ services:
         delay: 10s
         max_attempts: 10
         window: 180s
+  growthbook:
+    environment:
+      - TRACING_PROVIDER=opentelemetry
+    image: 'growthbook/growthbook:5.1.0'
+    volumes:
+      - 'uploads:/usr/local/src/app/packages/back-end/uploads'
+    env_file: ./growthbook/dashboard/.env
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
+      - 'traefik.http.services.growth-dashboard.loadbalancer.server.port=${DASHBOARD_PORT}'
+      - 'traefik.http.routers.growth-dashboard.entrypoints=web,websecure'
+      - traefik.http.routers.growth-dashboard.service=growth-dashboard
+      - traefik.http.routers.growth-dashboard.tls=true
+      - 'traefik.http.routers.growth-dashboard.tls.certresolver=${CERT_RESOLVER}'
+      - 'traefik.http.routers.growth-api.rule=Host(`${DASHBOARD_API_HOST}`)'
+      - 'traefik.http.services.growth-api.loadbalancer.server.port=${API_PORT}'
+      - 'traefik.http.routers.growth-api.entrypoints=web,websecure'
+      - traefik.http.routers.growth-api.service=growth-api
+      - traefik.http.routers.growth-api.tls=true
+      - 'traefik.http.routers.growth-api.tls.certresolver=${CERT_RESOLVER}'
+    networks:
+      default:
+        aliases:
+          - growthbook
+    logging:
+      options:
+        max-size: 10m
+        max-file: 3
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - >-
+          require("http").get("http://127.0.0.1:${API_PORT}",r=>process.exit(r.statusCode===200?0:1)).on("error",()=>process.exit(1))
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 256M
+          cpus: '0.20'
+        limits:
+          memory: 800M
+          cpus: '0.80'
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 180s
+  growthbook_proxy:
+    image: 'growthbook/proxy:v1.4.0'
+    env_file: ./growthbook/proxy/.env
+    networks:
+      default:
+        aliases:
+          - growthbook-proxy
+    labels:
+      - 'traefik.enable=${TRAEFIK_ENABLE}'
+      - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
+      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
+      - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
+      - traefik.http.routers.growth-proxy.service=growth-proxy
+      - traefik.http.routers.growth-proxy.tls=true
+      - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
+    logging:
+      options:
+        max-size: 10m
+        max-file: 3
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - |-
+          fetch('http://127.0.0.1:3300/healthcheck')
+            .then(r => r.json())
+            .then(d => process.exit(d.ok ? 0 : 1))
+            .catch(() => process.exit(1))
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        reservations:
+          memory: 64M
+        limits:
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 10
+        window: 180s
   website:
     image: 'ghcr.io/anitrend/website:0.4.2'
     networks:
@@ -102,113 +209,6 @@ services:
         limits:
           memory: 384M
           cpus: '0.50'
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 10
-        window: 180s
-  growthbook_proxy:
-    image: 'growthbook/proxy:v1.4.0'
-    env_file: ./growthbook/proxy/.env
-    networks:
-      default:
-        aliases:
-          - growthbook-proxy
-    labels:
-      - 'traefik.enable=${TRAEFIK_ENABLE}'
-      - 'traefik.http.routers.growth-proxy.rule=Host(`${HOST}`)'
-      - 'traefik.http.services.growth-proxy.loadbalancer.server.port=${PORT}'
-      - 'traefik.http.routers.growth-proxy.entrypoints=web,websecure'
-      - traefik.http.routers.growth-proxy.service=growth-proxy
-      - traefik.http.routers.growth-proxy.tls=true
-      - 'traefik.http.routers.growth-proxy.tls.certresolver=${CERT_RESOLVER}'
-    logging:
-      options:
-        max-size: 10m
-        max-file: 3
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - '-e'
-        - |-
-          fetch('http://127.0.0.1:3300/healthcheck')
-            .then(r => r.json())
-            .then(d => process.exit(d.ok ? 0 : 1))
-            .catch(() => process.exit(1))
-      interval: 20s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      resources:
-        reservations:
-          memory: 64M
-        limits:
-          memory: 256M
-      restart_policy:
-        condition: on-failure
-        delay: 10s
-        max_attempts: 10
-        window: 180s
-  growthbook:
-    environment:
-      - TRACING_PROVIDER=opentelemetry
-    image: 'growthbook/growthbook:5.1.0'
-    volumes:
-      - 'uploads:/usr/local/src/app/packages/back-end/uploads'
-    env_file: ./growthbook/dashboard/.env
-    labels:
-      - 'traefik.enable=${TRAEFIK_ENABLE}'
-      - 'traefik.http.routers.growth-dashboard.rule=Host(`${DASHBOARD_HOST}`)'
-      - 'traefik.http.services.growth-dashboard.loadbalancer.server.port=${DASHBOARD_PORT}'
-      - 'traefik.http.routers.growth-dashboard.entrypoints=web,websecure'
-      - traefik.http.routers.growth-dashboard.service=growth-dashboard
-      - traefik.http.routers.growth-dashboard.tls=true
-      - 'traefik.http.routers.growth-dashboard.tls.certresolver=${CERT_RESOLVER}'
-      - 'traefik.http.routers.growth-api.rule=Host(`${DASHBOARD_API_HOST}`)'
-      - 'traefik.http.services.growth-api.loadbalancer.server.port=${API_PORT}'
-      - 'traefik.http.routers.growth-api.entrypoints=web,websecure'
-      - traefik.http.routers.growth-api.service=growth-api
-      - traefik.http.routers.growth-api.tls=true
-      - 'traefik.http.routers.growth-api.tls.certresolver=${CERT_RESOLVER}'
-    networks:
-      default:
-        aliases:
-          - growthbook
-    logging:
-      options:
-        max-size: 10m
-        max-file: 3
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - '-e'
-        - >-
-          require("http").get("http://127.0.0.1:${API_PORT}",r=>process.exit(r.statusCode===200?0:1)).on("error",()=>process.exit(1))
-      interval: 20s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      resources:
-        reservations:
-          memory: 256M
-          cpus: '0.20'
-        limits:
-          memory: 800M
-          cpus: '0.80'
       restart_policy:
         condition: on-failure
         delay: 10s
