@@ -96,7 +96,7 @@ services:
         max_attempts: 10
         window: 180s
   growthbook_proxy:
-    image: 'growthbook/proxy:v1.4.0'
+    image: 'growthbook/proxy:v1.5.0'
     env_file: ./growthbook/proxy/.env
     networks:
       default:
