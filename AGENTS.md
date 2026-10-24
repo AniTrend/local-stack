@@ -16,6 +16,11 @@ Local-Stack is migrating from per-service Compose to modular Docker Swarm stacks
 - Keep exposed services attached to the shared `traefik-public` network and route them with Traefik labels and [traefik/config/dynamic.yml](traefik/config/dynamic.yml).
 - Update Grafana provisioning under [observability/grafana/config/provisioning/](observability/grafana/config/provisioning/) when dashboards or datasources change.
 
+## Planned Platform Migration
+
+- Read [docs/platform/README.md](docs/platform/README.md) and its linked execution contract before working on the proposed Pulumi, Ansible and Dokploy migration. Its phases require local Docker validation and a disposable host rehearsal before production cutover.
+- Existing service/Swarm conventions above remain active until the documented ownership handoff. Keep the plan and issue acceptance criteria aligned when changing a decision.
+
 ## Project Skills
 
 - [project-local-stack-overview](.agents/skills/project-local-stack-overview/SKILL.md) for repo structure, stack ownership, and Swarm migration context.

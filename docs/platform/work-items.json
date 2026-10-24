@@ -1,0 +1,363 @@
+{
+  "schema_version": "anitrend.platform-roadmap.v1",
+  "baseline_commit": "e80a48a8b8d7d4d9732840b618e73a2f4b58a1c3",
+  "status_source": "GitHub issues; no cached progress status",
+  "epic_url": null,
+  "documentation_entrypoint": "docs/platform/README.md",
+  "core_completion_ids": [
+    "P0-01",
+    "P1-01",
+    "P1-02",
+    "P1-03",
+    "P2-01",
+    "P2-02",
+    "P2-03",
+    "P2-04",
+    "P3-01",
+    "P3-02",
+    "P3-03",
+    "P4-01",
+    "P5-01",
+    "P5-02",
+    "P6-01"
+  ],
+  "items": [
+    {
+      "id": "P0-01",
+      "phase": 0,
+      "title": "docs(platform): phase 0 reconcile the live inventory and migration constraints",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [],
+      "documentation": [
+        "docs/platform/current-state.md",
+        "docs/platform/migration-runbook.md"
+      ],
+      "required_commands": [
+        "make platform-inventory ENV=lab",
+        "make platform-inventory-validate ENV=lab"
+      ]
+    },
+    {
+      "id": "P1-01",
+      "phase": 1,
+      "title": "feat(platform): phase 1 add an isolated Docker lab and validation contract",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [],
+      "documentation": [
+        "docs/platform/validation.md",
+        "docs/platform/agent-execution.md",
+        "docs/platform/adr-0001-platform-ownership.md"
+      ],
+      "required_commands": [
+        "make platform-doctor ENV=lab",
+        "make platform-lab-up ENV=lab",
+        "make platform-lab-test ENV=lab",
+        "make platform-lab-down ENV=lab"
+      ]
+    },
+    {
+      "id": "P1-02",
+      "phase": 1,
+      "title": "feat(infra): phase 1 add Pulumi Hetzner provisioning and protected state",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P1-01"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/validation.md",
+        "docs/platform/migration-runbook.md"
+      ],
+      "required_commands": [
+        "make platform-pulumi-test ENV=lab",
+        "make platform-preview ENV=lab"
+      ]
+    },
+    {
+      "id": "P1-03",
+      "phase": 1,
+      "title": "feat(ansible): phase 1 add an idempotent host baseline with container and VM tests",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P1-01",
+        "P1-02"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/validation.md"
+      ],
+      "required_commands": [
+        "make platform-ansible-test ENV=lab",
+        "make platform-host-verify ENV=lab TIER=vm"
+      ]
+    },
+    {
+      "id": "P2-01",
+      "phase": 2,
+      "title": "feat(platform): phase 2 bootstrap Dokploy and reconcile its service registry",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P1-02",
+        "P1-03"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/validation.md",
+        "docs/platform/agent-execution.md"
+      ],
+      "required_commands": [
+        "make platform-dokploy-test ENV=lab",
+        "make platform-registry-check ENV=lab TIER=vm"
+      ]
+    },
+    {
+      "id": "P2-02",
+      "phase": 2,
+      "title": "feat(network): phase 2 isolate administration behind Tailscale and test ingress boundaries",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P1-02",
+        "P1-03",
+        "P2-01"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/validation.md",
+        "docs/platform/migration-runbook.md"
+      ],
+      "required_commands": [
+        "make platform-network-test ENV=lab TIER=vm",
+        "make platform-network-test ENV=rehearsal"
+      ]
+    },
+    {
+      "id": "P2-03",
+      "phase": 2,
+      "title": "feat(secrets): phase 2 deliver SOPS secrets to Dokploy without leaking deployment artifacts",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P1-01",
+        "P2-01",
+        "P2-02"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/validation.md"
+      ],
+      "required_commands": [
+        "make platform-secrets-test ENV=lab",
+        "make platform-artifact-scan ENV=lab"
+      ]
+    },
+    {
+      "id": "P2-04",
+      "phase": 2,
+      "title": "feat(deploy): phase 2 adapt service sources into reproducible Dokploy deployment units",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P0-01",
+        "P1-01",
+        "P2-01",
+        "P2-02",
+        "P2-03"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/current-state.md",
+        "docs/platform/validation.md"
+      ],
+      "required_commands": [
+        "make platform-render ENV=lab",
+        "make platform-compose-test ENV=lab",
+        "make platform-release-verify ENV=lab"
+      ]
+    },
+    {
+      "id": "P3-01",
+      "phase": 3,
+      "title": "feat(ci): phase 3 promote verified releases through the private Dokploy API",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P1-02",
+        "P2-01",
+        "P2-02",
+        "P2-03",
+        "P2-04"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/validation.md",
+        "docs/platform/agent-execution.md"
+      ],
+      "required_commands": [
+        "make platform-ci-contract-test ENV=lab",
+        "make platform-promote-test ENV=lab TIER=vm",
+        "make platform-release-verify ENV=lab"
+      ]
+    },
+    {
+      "id": "P3-02",
+      "phase": 3,
+      "title": "feat(backup): phase 3 implement off-host backups and prove cold restoration",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P0-01",
+        "P2-01",
+        "P2-03",
+        "P2-04"
+      ],
+      "documentation": [
+        "docs/platform/migration-runbook.md",
+        "docs/platform/validation.md",
+        "docs/platform/adr-0001-platform-ownership.md"
+      ],
+      "required_commands": [
+        "make platform-backup-test ENV=lab",
+        "make platform-restore-test ENV=lab TIER=vm",
+        "make platform-artifact-scan ENV=lab"
+      ]
+    },
+    {
+      "id": "P3-03",
+      "phase": 3,
+      "title": "feat(ops): phase 3 verify service health resource budgets and deployment observability",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P0-01",
+        "P2-02",
+        "P2-04",
+        "P3-01"
+      ],
+      "documentation": [
+        "docs/platform/current-state.md",
+        "docs/platform/validation.md",
+        "docs/platform/migration-runbook.md"
+      ],
+      "required_commands": [
+        "make platform-smoke ENV=lab TIER=vm",
+        "make platform-observability-test ENV=lab TIER=vm"
+      ]
+    },
+    {
+      "id": "P4-01",
+      "phase": 4,
+      "title": "test(platform): phase 4 rehearse provisioning deployment restore and rollback on Hetzner",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P0-01",
+        "P1-01",
+        "P1-02",
+        "P1-03",
+        "P2-01",
+        "P2-02",
+        "P2-03",
+        "P2-04",
+        "P3-01",
+        "P3-02",
+        "P3-03"
+      ],
+      "documentation": [
+        "docs/platform/validation.md",
+        "docs/platform/migration-runbook.md",
+        "docs/platform/agent-execution.md"
+      ],
+      "required_commands": [
+        "make platform-rehearse ENV=rehearsal",
+        "make platform-restore-test ENV=rehearsal",
+        "make platform-network-test ENV=rehearsal",
+        "make platform-evidence-validate ENV=rehearsal"
+      ]
+    },
+    {
+      "id": "P5-01",
+      "phase": 5,
+      "title": "feat(migration): phase 5 provision the production target and validate an isolated canary",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P4-01"
+      ],
+      "documentation": [
+        "docs/platform/migration-runbook.md",
+        "docs/platform/validation.md",
+        "docs/platform/adr-0001-platform-ownership.md"
+      ],
+      "required_commands": [
+        "make platform-preview ENV=production",
+        "make platform-canary ENV=production",
+        "make platform-evidence-validate ENV=production"
+      ]
+    },
+    {
+      "id": "P5-02",
+      "phase": 5,
+      "title": "feat(migration): phase 5 cut over services with writer fencing and data-safe recovery",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P5-01"
+      ],
+      "documentation": [
+        "docs/platform/migration-runbook.md",
+        "docs/platform/agent-execution.md",
+        "docs/platform/validation.md"
+      ],
+      "required_commands": [
+        "make platform-cutover-preflight ENV=production",
+        "make platform-cutover ENV=production",
+        "make platform-smoke ENV=production",
+        "make platform-evidence-validate ENV=production"
+      ]
+    },
+    {
+      "id": "P6-01",
+      "phase": 6,
+      "title": "chore(platform): phase 6 retire legacy deployment ownership and complete operations handover",
+      "optional": false,
+      "issue_url": null,
+      "prerequisites": [
+        "P5-02"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/migration-runbook.md",
+        "docs/platform/agent-execution.md"
+      ],
+      "required_commands": [
+        "make platform-ownership-check ENV=production",
+        "make platform-ops-verify ENV=production",
+        "make platform-validate ENV=lab"
+      ]
+    },
+    {
+      "id": "P7-01",
+      "phase": 7,
+      "title": "refactor(gateway): phase 7 evaluate APISIX standalone against Kong without blocking migration",
+      "optional": true,
+      "issue_url": null,
+      "prerequisites": [
+        "P6-01"
+      ],
+      "documentation": [
+        "docs/platform/adr-0001-platform-ownership.md",
+        "docs/platform/current-state.md",
+        "docs/platform/validation.md"
+      ],
+      "required_commands": [
+        "make platform-gateway-contract-test ENV=lab"
+      ]
+    }
+  ]
+}
