@@ -9,6 +9,10 @@ A local development environment for the AniTrend stack, providing a complete inf
 >
 > Quick start (Swarm): run `stackctl doctor && stackctl up` (requires Docker Swarm enabled).  See `stacks/README.md` for the full runbook. To auto-create the overlay network, use the compatibility path `./stackctl.sh doctor --fix-network` (the CLI's `doctor` has no `--fix-network` option).
 
+## Planned platform migration
+
+The [private platform implementation plan](docs/platform/README.md) defines the proposed Pulumi, Ansible and Dokploy migration, local Docker validation gates and linked implementation phases. Current deployment instructions below remain active until each service's documented ownership handoff.
+
 ## Stack Components
 
 ### Gateway & Routing
