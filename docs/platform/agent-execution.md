@@ -8,7 +8,7 @@ Read AGENTS.md, this plan's README, ADR, current-state snapshot, validation cont
 
 ## Work selection and continuation
 
-Use work-items.json for the dependency graph and issue URLs. Query GitHub for current issue/PR state and read prerequisite completion evidence. Never assume an issue is implemented just because it is closed. Start only work whose prerequisites are complete, except that independent P0 discovery and P1 lab work can proceed separately.
+Use work-items.json for the dependency graph and issue URLs. Query GitHub for current issue/PR state and read prerequisite completion evidence. Never assume an issue is implemented just because it is closed. Start only work whose prerequisites are complete, except that independent P0 discovery and P1 lab work can proceed separately. The documentation PR is a versioned starting point, not an additional permission checkpoint for authorized implementation.
 
 Use an isolated branch/worktree for each coherent implementation change. Refresh dev and record its SHA. Compare newer source with the immutable planning baseline; update affected assumptions through review. Do not reset or overwrite unrelated user/agent changes.
 
