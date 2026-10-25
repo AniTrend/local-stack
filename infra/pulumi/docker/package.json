@@ -1,0 +1,22 @@
+{
+  "name": "anitrend-platform-lab",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@pulumi/docker": "5.2.0",
+    "@pulumi/pulumi": "3.272.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "build": "tsc --outDir .artifacts/build --rootDir ..",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.cjs"
+  }
+}

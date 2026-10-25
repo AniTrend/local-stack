@@ -1,0 +1,8 @@
+{
+  "schema_version": "anitrend.platform.lab-images.v1",
+  "ssh_fixture": {
+    "image": "lscr.io/linuxserver/openssh-server@sha256:0f535b0faa7448511b23528165e9fbd4f1fe563b861b3dcaa5ddb0ddbfe2254c",
+    "port": 2222,
+    "platforms": ["linux/amd64", "linux/arm64"]
+  }
+}

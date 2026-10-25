@@ -1,0 +1,6 @@
+name: anitrend-platform-lab
+description: Isolated, disposable Docker resources for AniTrend platform validation.
+runtime:
+  name: nodejs
+  options:
+    typescript: true
