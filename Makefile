@@ -28,7 +28,7 @@ ifneq ($(wildcard $(PLATFORM_TOOLS_BIN)/pulumi),)
 export PATH := $(abspath $(PLATFORM_TOOLS_BIN)):$(PATH)
 endif
 
-.PHONY: help platform-doctor platform-lab-up platform-lab-test platform-lab-down
+.PHONY: help platform-doctor platform-lab-up platform-lab-test platform-lab-down platform-pulumi-test platform-preview
 
 help:
 	@printf '%s\n' \
@@ -36,7 +36,10 @@ help:
 	  '  make platform-doctor ENV=lab' \
 	  '  make platform-lab-up ENV=lab' \
 	  '  make platform-lab-test ENV=lab' \
-	  '  make platform-lab-down ENV=lab'
+	  '  make platform-lab-down ENV=lab' \
+	  'Platform Pulumi:' \
+	  '  make platform-pulumi-test ENV=lab' \
+	  '  make platform-preview ENV=lab|rehearsal|production'
 
 platform-doctor:
 	@test "$(ENV)" = "lab" || { printf '%s\n' 'ENV=lab is required for platform-doctor' >&2; exit 2; }
@@ -53,6 +56,16 @@ platform-lab-test:
 platform-lab-down:
 	@test "$(ENV)" = "lab" || { printf '%s\n' 'ENV=lab is required for platform-lab-down' >&2; exit 2; }
 	@$(PLATFORM_PYTHON_BIN) $(LAB_CLI) down --environment "$(ENV)"
+
+platform-pulumi-test:
+	@test "$(ENV)" = "lab" || { printf '%s\n' 'ENV=lab is required for platform-pulumi-test' >&2; exit 2; }
+	@$(PLATFORM_NPM_BIN) test --prefix infra/pulumi/docker
+	@$(PLATFORM_NPM_BIN) test --prefix infra/pulumi/hcloud
+	@$(PLATFORM_PYTHON_BIN) -m pytest -q tests/platform
+
+platform-preview:
+	@test -n "$(ENV)" || { printf '%s\n' 'ENV is required for platform-preview' >&2; exit 2; }
+	@$(PLATFORM_PYTHON_BIN) tools/platform/pulumi_preview.py --environment "$(ENV)"
 
 .DEFAULT:
 	@printf 'No rule for target "%s"; unimplemented platform commands fail closed.\n' "$@" >&2

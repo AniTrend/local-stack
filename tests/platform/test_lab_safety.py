@@ -199,6 +199,14 @@ def test_lab_down_without_active_run_never_invokes_pulumi(tmp_path: Path):
     assert not result.test_pulumi_log.exists()
 
 
+def test_lab_preview_without_active_run_fails_before_pulumi(tmp_path: Path):
+    result = run_lab_command(tmp_path, "preview")
+
+    assert result.returncode != 0
+    assert "active lab run" in result.stderr.lower()
+    assert not result.test_pulumi_log.exists()
+
+
 @pytest.mark.parametrize(
     "existing_resource_type",
     [

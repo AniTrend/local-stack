@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:anitrend:platform:environment:v1",
+  "title": "AniTrend platform environment intent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "target_environment", "inputs"],
+  "properties": {
+    "schema_version": { "const": "anitrend.platform.environment.v1" },
+    "target_environment": { "const": "production" },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "allowed_docker_contexts",
+        "safety_policy",
+        "source_host_identity_ref",
+        "deployment_owner_map_ref",
+        "deployment_freeze_steps_ref",
+        "service_dependency_map_ref",
+        "database_runtime_facts_ref",
+        "gateway_policy_export_ref",
+        "external_provider_map_ref",
+        "backup_restore_matrix_ref",
+        "hetzner_project_ref",
+        "region",
+        "server_type",
+        "architecture",
+        "os_image",
+        "network_cidrs",
+        "volumes",
+        "public_routes",
+        "private_routes",
+        "dns_provider_ref",
+        "dns_zone_ref",
+        "dns_records",
+        "private_hostnames",
+        "certificate_strategy_ref",
+        "tailnet_grants_ref",
+        "state_backend_ref",
+        "backup_destination_ref",
+        "backup_retention_days",
+        "credential_refs",
+        "recovery_credential_refs",
+        "rpo_hours",
+        "rto_minutes",
+        "maintenance_window_ref",
+        "maximum_downtime_minutes",
+        "rollback_thresholds",
+        "writer_job_map_ref"
+      ],
+      "properties": {
+        "provider": { "$ref": "#/$defs/providerInput" },
+        "allowed_docker_contexts": { "$ref": "#/$defs/stringListInput" },
+        "safety_policy": { "$ref": "#/$defs/safetyPolicyInput" },
+        "source_host_identity_ref": { "$ref": "#/$defs/stringInput" },
+        "deployment_owner_map_ref": { "$ref": "#/$defs/stringInput" },
+        "deployment_freeze_steps_ref": { "$ref": "#/$defs/stringInput" },
+        "service_dependency_map_ref": { "$ref": "#/$defs/stringInput" },
+        "database_runtime_facts_ref": { "$ref": "#/$defs/stringInput" },
+        "gateway_policy_export_ref": { "$ref": "#/$defs/stringInput" },
+        "external_provider_map_ref": { "$ref": "#/$defs/stringInput" },
+        "backup_restore_matrix_ref": { "$ref": "#/$defs/stringInput" },
+        "hetzner_project_ref": { "$ref": "#/$defs/stringInput" },
+        "region": { "$ref": "#/$defs/stringInput" },
+        "server_type": { "$ref": "#/$defs/stringInput" },
+        "architecture": { "$ref": "#/$defs/stringInput" },
+        "os_image": { "$ref": "#/$defs/stringInput" },
+        "network_cidrs": { "$ref": "#/$defs/networkListInput" },
+        "volumes": { "$ref": "#/$defs/volumeListInput" },
+        "public_routes": { "$ref": "#/$defs/routeListInput" },
+        "private_routes": { "$ref": "#/$defs/routeListInput" },
+        "dns_provider_ref": { "$ref": "#/$defs/stringInput" },
+        "dns_zone_ref": { "$ref": "#/$defs/stringInput" },
+        "dns_records": { "$ref": "#/$defs/dnsRecordListInput" },
+        "private_hostnames": { "$ref": "#/$defs/stringListInput" },
+        "certificate_strategy_ref": { "$ref": "#/$defs/stringInput" },
+        "tailnet_grants_ref": { "$ref": "#/$defs/stringInput" },
+        "state_backend_ref": { "$ref": "#/$defs/stringInput" },
+        "backup_destination_ref": { "$ref": "#/$defs/stringInput" },
+        "backup_retention_days": { "$ref": "#/$defs/integerInput" },
+        "credential_refs": { "$ref": "#/$defs/credentialListInput" },
+        "recovery_credential_refs": { "$ref": "#/$defs/credentialListInput" },
+        "rpo_hours": { "$ref": "#/$defs/integerInput" },
+        "rto_minutes": { "$ref": "#/$defs/integerInput" },
+        "maintenance_window_ref": { "$ref": "#/$defs/stringInput" },
+        "maximum_downtime_minutes": { "$ref": "#/$defs/integerInput" },
+        "rollback_thresholds": { "$ref": "#/$defs/stringListInput" },
+        "writer_job_map_ref": { "$ref": "#/$defs/stringInput" }
+      }
+    }
+  },
+  "$defs": {
+    "inputBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "value", "evidence_ref"],
+      "properties": {
+        "status": { "enum": ["confirmed", "unresolved", "not_applicable"] },
+        "value": {},
+        "evidence_ref": { "type": ["string", "null"], "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "unresolved" } }, "required": ["status"] },
+          "then": { "properties": { "value": { "type": "null" }, "evidence_ref": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "confirmed" } }, "required": ["status"] },
+          "then": { "properties": { "value": { "not": { "type": "null" } }, "evidence_ref": { "type": "string", "minLength": 1 } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "not_applicable" } }, "required": ["status"] },
+          "then": { "properties": { "value": { "type": "null" }, "evidence_ref": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "stringInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        { "properties": { "value": { "type": ["string", "null"], "minLength": 1 } } }
+      ]
+    },
+    "providerInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        { "properties": { "value": { "enum": ["hcloud", null] } } }
+      ]
+    },
+    "safetyPolicyInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        {
+          "properties": {
+            "value": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "required": ["protect_resources", "allow_destroy", "require_environment_approval", "deny_pull_request_mutations"],
+              "properties": {
+                "protect_resources": { "type": "boolean" },
+                "allow_destroy": { "type": "boolean" },
+                "require_environment_approval": { "type": "boolean" },
+                "deny_pull_request_mutations": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "integerInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        { "properties": { "value": { "type": ["integer", "null"], "minimum": 0 } } }
+      ]
+    },
+    "stringListInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        { "properties": { "value": { "type": ["array", "null"], "items": { "type": "string", "minLength": 1 } } } }
+      ]
+    },
+    "credentialListInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        { "properties": { "value": { "type": ["array", "null"], "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]+$" } } } }
+      ]
+    },
+    "networkListInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        {
+          "properties": {
+            "value": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "cidr", "purpose"],
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "cidr": { "type": "string", "minLength": 1 },
+                  "purpose": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "volumeListInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        {
+          "properties": {
+            "value": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id_ref", "size_gb", "mount_path", "data_classification", "protected"],
+                "properties": {
+                  "id_ref": { "type": "string", "minLength": 1 },
+                  "size_gb": { "type": "number", "exclusiveMinimum": 0 },
+                  "mount_path": { "type": "string", "minLength": 1 },
+                  "data_classification": { "type": "string", "minLength": 1 },
+                  "protected": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "routeListInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        {
+          "properties": {
+            "value": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["hostname", "service_ref", "port", "protocol"],
+                "properties": {
+                  "hostname": { "type": "string", "minLength": 1 },
+                  "service_ref": { "type": "string", "minLength": 1 },
+                  "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                  "protocol": { "enum": ["http", "https", "tcp", "udp"] }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "dnsRecordListInput": {
+      "allOf": [
+        { "$ref": "#/$defs/inputBase" },
+        {
+          "properties": {
+            "value": {
+              "type": ["array", "null"],
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["hostname", "record_type", "target_ref", "ttl_seconds"],
+                "properties": {
+                  "hostname": { "type": "string", "minLength": 1 },
+                  "record_type": { "enum": ["A", "AAAA", "CNAME"] },
+                  "target_ref": { "type": "string", "minLength": 1 },
+                  "ttl_seconds": { "type": "integer", "minimum": 1 }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

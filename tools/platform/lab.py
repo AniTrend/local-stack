@@ -1272,6 +1272,37 @@ def _lab_test(environment: str, repo_root: Path, requested_run_id: Optional[str]
     print("controlled_update=pass")
 
 
+def _lab_preview(environment: str, repo_root: Path, requested_run_id: Optional[str]) -> None:
+    run_id, stack_name, run_dir, _ = _read_active_run(repo_root, requested_run_id)
+    manifest = _read_manifest(run_dir, run_id)
+    _assert_source_snapshot(repo_root, manifest)
+    outputs = manifest.get("outputs")
+    if (
+        manifest.get("pulumi_stack_created") is not True
+        or manifest.get("pulumi_up") != "pass"
+        or not isinstance(outputs, dict)
+        or manifest.get("cleanup_status") == "pass"
+    ):
+        raise LabError("run platform-lab-up before platform-preview")
+
+    readiness = _doctor(environment, repo_root)
+    passphrase = _read_text(run_dir / "passphrase", "lab state passphrase")
+    _pulumi_login(repo_root, run_dir, passphrase)
+    _pulumi_resource_inventory(repo_root, run_dir, passphrase, stack_name, run_id, manifest, readiness)
+    preview_output = _pulumi(
+        repo_root,
+        run_dir,
+        passphrase,
+        ["preview", "--diff", "--non-interactive", "--stack", stack_name],
+    )
+    if preview_output:
+        print(preview_output)
+    print("platform-lab-preview=pass")
+    print("run_id=" + run_id)
+    print("pulumi_stack=" + stack_name)
+
+
+
 def _state_label_map(value: Any) -> Optional[Dict[str, str]]:
     if isinstance(value, dict):
         return {str(key): str(item) for key, item in value.items()}
@@ -1474,6 +1505,7 @@ def _argument_parser() -> argparse.ArgumentParser:
         "up": "create or resume the isolated Pulumi Docker lab",
         "test": "verify lab resources, SSH access, and a controlled update",
         "down": "destroy only resources in the active lab Pulumi stack",
+        "preview": "show a non-mutating preview for the active local Docker lab stack",
     }
     for name, description in commands.items():
         command = subparsers.add_parser(name, help=description)
@@ -1498,6 +1530,8 @@ def main(arguments: Optional[Sequence[str]] = None) -> int:
                     _lab_up(options.environment, repo_root, options.run_id)
                 elif options.command == "test":
                     _lab_test(options.environment, repo_root, options.run_id)
+                elif options.command == "preview":
+                    _lab_preview(options.environment, repo_root, options.run_id)
                 else:
                     _lab_down(options.environment, repo_root, options.run_id)
         return 0
