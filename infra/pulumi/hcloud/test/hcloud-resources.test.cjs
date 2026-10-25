@@ -70,7 +70,7 @@ pulumi.runtime.setMocks(
 );
 
 const { createHcloudInventory, protectedOptions, validateHcloudPreflight } = require("../.artifacts/build/hcloud/resources.js");
-const provider = new hcloud.Provider("test-provider", { token: "mock-secret" });
+const provider = new hcloud.Provider("test-provider", { token: "mock-provider-value" });
 
 test("provisions protected HCloud resources and exports schema-valid non-secret inventory", async () => {
   const intent = validIntent();
@@ -161,7 +161,7 @@ test("provisions protected HCloud resources and exports schema-valid non-secret 
   assert.equal(inventory.firewall_policy.private_routes[0].port, 5432);
   assert.equal(inventory.volumes[0].mount_path, "/var/lib/postgresql");
   assert.ok(inventory.resource_ids.some((item) => item.kind === "server_network"));
-  assert.ok(!JSON.stringify(inventory).includes("mock-secret"));
+  assert.ok(!JSON.stringify(inventory).includes("mock-provider-value"));
   assert.ok(!JSON.stringify(inventory).includes("ssh-ed25519"));
 });
 
