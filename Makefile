@@ -24,6 +24,9 @@ endif
 ifneq ($(wildcard $(PLATFORM_NODE_DIR)/node),)
 export PATH := $(abspath $(PLATFORM_NODE_DIR)):$(PATH)
 endif
+ifneq ($(wildcard $(PLATFORM_TOOLS_BIN)/pulumi),)
+export PATH := $(abspath $(PLATFORM_TOOLS_BIN)):$(PATH)
+endif
 
 .PHONY: help platform-doctor platform-lab-up platform-lab-test platform-lab-down
 

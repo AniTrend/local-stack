@@ -19,7 +19,7 @@ npm exec --yes --package=node@24.22.1 --package=npm@11.19.1 -- npm ci --prefix i
 
 `ansible-galaxy` installs the pinned collections into the ignored project-local `.tools/platform/collections`; the Makefile sets Ansible's collection search path there, and `platform-doctor` fails if any pinned collection is missing or mismatched. The `npm exec` command uses the exact Node and npm versions from the pins without changing machine-wide defaults. Run the Make targets below from a shell with those versions on `PATH`, or prepend the same `npm exec` package prefix to each `make` command.
 
-Install Pulumi CLI `3.272.0` in `.tools/platform/bin/pulumi`, or set `PLATFORM_PULUMI_BIN` to an existing pinned executable. Pulumi release assets and their GitHub-published SHA-256 digests:
+Install the full Pulumi `3.272.0` distribution, including `pulumi-language-nodejs`, under `.tools/platform/bin`. The Makefile adds this directory to `PATH` when its pinned CLI is present. If `PLATFORM_PULUMI_BIN` points elsewhere, keep the matching language plugin available on `PATH`. Pulumi release assets and their GitHub-published SHA-256 digests:
 
 | Host | Asset | SHA-256 |
 |---|---|---|
