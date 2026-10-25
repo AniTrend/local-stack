@@ -1298,16 +1298,30 @@ def _pulumi_resource_inventory(
         state = json.loads(raw)
     except json.JSONDecodeError as error:
         raise LabError("Pulumi lab state is not valid JSON") from error
-    resources = state.get("deployment", {}).get("resources") if isinstance(state, dict) else None
-    if not isinstance(resources, list):
-        raise LabError("Pulumi lab state has no resource inventory")
-
+    deployment = state.get("deployment") if isinstance(state, dict) else None
+    resources = deployment.get("resources") if isinstance(deployment, dict) else None
     outputs = manifest.get("outputs")
     names = {
         "network": outputs.get("network_name") if isinstance(outputs, dict) else f"anitrend-platform-lab-{run_id}-network",
         "volume": outputs.get("volume_name") if isinstance(outputs, dict) else f"anitrend-platform-lab-{run_id}-config",
         "container": outputs.get("container_name") if isinstance(outputs, dict) else f"anitrend-platform-lab-{run_id}-ssh",
     }
+    if not isinstance(resources, list):
+        empty_preapply_checkpoint = (
+            isinstance(state, dict)
+            and state.get("version") == 3
+            and isinstance(deployment, dict)
+            and "resources" not in deployment
+            and isinstance(deployment.get("manifest"), dict)
+            and isinstance(deployment.get("secrets_providers"), dict)
+            and isinstance(deployment.get("metadata"), dict)
+            and outputs is None
+            and manifest.get("pulumi_preview") != "pass"
+            and manifest.get("pulumi_up") != "pass"
+        )
+        if not empty_preapply_checkpoint:
+            raise LabError("Pulumi lab state has no resource inventory")
+        resources = []
     roles = {
         "docker:index/container:Container": ("container", "ssh-fixture"),
         "docker:index/network:Network": ("network", "network"),
@@ -1346,6 +1360,13 @@ def _pulumi_resource_inventory(
         if labels is None or labels.get("anitrend.platform.run-id") != run_id or labels.get("anitrend.platform.resource") != label_role:
             raise LabError("Pulumi resource labels do not identify the active lab run")
         observed.append({"type": resource_type, "name": resource_name})
+    tracked_resources = {(resource["type"], resource["name"]) for resource in observed}
+    for resource_type, (logical_name, _) in roles.items():
+        resource_name = names[logical_name]
+        if (resource_type, resource_name) in tracked_resources:
+            continue
+        if _docker_inspected_resource(readiness["docker_context"], resource_type, resource_name) is not None:
+            raise LabError("untracked Docker resource exists outside the Pulumi lab state")
     return observed
 
 

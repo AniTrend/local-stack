@@ -199,6 +199,81 @@ def test_lab_down_without_active_run_never_invokes_pulumi(tmp_path: Path):
     assert not result.test_pulumi_log.exists()
 
 
+@pytest.mark.parametrize(
+    "existing_resource_type",
+    [
+        None,
+        "docker:index/container:Container",
+        "docker:index/network:Network",
+        "docker:index/volume:Volume",
+    ],
+    ids=["no-run-resources", "orphan-container", "orphan-network", "orphan-volume"],
+)
+def test_empty_preapply_pulumi_state_is_cleanable_only_without_run_resources(
+    tmp_path: Path,
+    monkeypatch,
+    existing_resource_type: Optional[str],
+):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    run_id = "20261025T123456Z-12345678"
+    state = {
+        "version": 3,
+        "deployment": {
+            "manifest": {"version": "v3.272.0"},
+            "secrets_providers": {"type": "passphrase", "state": {"salt": "fixture"}},
+            "metadata": {},
+        },
+    }
+    inspected = []
+    monkeypatch.setattr(lab_cli, "_pulumi", lambda *args: json.dumps(state))
+
+    def inspect_resource(context, resource_type, name):
+        inspected.append((resource_type, name))
+        return {} if resource_type == existing_resource_type else None
+
+    monkeypatch.setattr(lab_cli, "_docker_inspected_resource", inspect_resource)
+
+    if existing_resource_type is None:
+        inventory = lab_cli._pulumi_resource_inventory(
+            tmp_path,
+            tmp_path,
+            "fixture-passphrase",
+            "platform-lab-" + run_id,
+            run_id,
+            {"outputs": None, "pulumi_preview": "pending", "pulumi_up": "pending"},
+            {
+                "docker_context": "fixture-local",
+                "docker_host": "unix:///var/run/docker.sock",
+            },
+        )
+        assert inventory == []
+        assert set(inspected) == {
+            ("docker:index/container:Container", f"anitrend-platform-lab-{run_id}-ssh"),
+            ("docker:index/network:Network", f"anitrend-platform-lab-{run_id}-network"),
+            ("docker:index/volume:Volume", f"anitrend-platform-lab-{run_id}-config"),
+        }
+    else:
+        with pytest.raises(lab_cli.LabError, match="untracked Docker resource"):
+            lab_cli._pulumi_resource_inventory(
+                tmp_path,
+                tmp_path,
+                "fixture-passphrase",
+                "platform-lab-" + run_id,
+                run_id,
+                {"outputs": None, "pulumi_preview": "pending", "pulumi_up": "pending"},
+                {
+                    "docker_context": "fixture-local",
+                    "docker_host": "unix:///var/run/docker.sock",
+                },
+            )
+
+
 def test_doctor_rejects_production_environment_before_docker(tmp_path: Path):
     result = run_doctor(tmp_path, environment="production")
 
