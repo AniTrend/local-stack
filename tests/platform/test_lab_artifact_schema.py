@@ -77,7 +77,11 @@ def _lab_manifest() -> dict[str, object]:
         "run_id": RUN_ID,
         "stack_name": "platform-lab-" + RUN_ID,
         "created_at": "2026-10-25T12:00:00Z",
-        "source": {"commit": "a" * 40, "worktree_clean": False},
+        "source": {
+            "commit": "a" * 40,
+            "worktree_clean": False,
+            "worktree_sha256": "b" * 64,
+        },
         "environment_facts": facts,
         "image_ref": IMAGE_REF,
         "image_digest": IMAGE_DIGEST,
@@ -127,3 +131,11 @@ def test_run_manifest_schema_rejects_local_endpoints_and_secrets():
     leaked_secret["private_key"] = "fixture-secret"
     with pytest.raises(jsonschema.ValidationError):
         validator.validate(leaked_secret)
+
+
+def test_run_manifest_schema_allows_legacy_source_record_for_cleanup():
+    validator = _validator("labRun")
+    legacy_manifest = _lab_manifest()
+    del legacy_manifest["source"]["worktree_sha256"]
+
+    validator.validate(legacy_manifest)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import hashlib
 import json
 import os
 import platform
@@ -18,7 +19,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
 
 import yaml
 
@@ -42,6 +43,19 @@ LAB_ARTIFACT_ROOT = Path(".artifacts/platform/lab")
 LAB_RUN_SCHEMA = "anitrend.platform.lab-run.v1"
 ACTIVE_RUN_SCHEMA = "anitrend.platform.lab-active-run.v1"
 RUN_ID_PATTERN = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{8}$")
+LAB_SOURCE_PATHS = (
+    ".gitignore",
+    ".node-version",
+    ".python-version",
+    "Makefile",
+    "ansible/requirements.yml",
+    "infra/pulumi/docker",
+    "infra/pulumi/shared",
+    "tools/platform/lab.py",
+    "tools/platform/pulumi-version.txt",
+    "tools/platform/requirements.in",
+    "tools/platform/requirements.lock",
+)
 RUN_RESOURCE_TYPES = {
     "docker:index/container:Container",
     "docker:index/network:Network",
@@ -96,12 +110,38 @@ def _run(
     return result.stdout.strip()
 
 
+def _git_bytes(repo_root: Path, arguments: Sequence[str]) -> bytes:
+    try:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+            timeout=30,
+        )
+    except FileNotFoundError as error:
+        raise LabError("Git source identity is unavailable") from error
+    except subprocess.TimeoutExpired as error:
+        raise LabError("Git source identity check timed out") from error
+    if result.returncode != 0:
+        raise LabError("Git source identity could not be read")
+    return result.stdout
+
+
 def _version(command: Sequence[str], pattern: str) -> str:
     output = _run(command)
     match = re.search(pattern, output)
     if match is None:
         raise LabError("a pinned tool reported an unrecognized version")
     return match.group(1)
+
+def _pulumi_binary(repo_root: Path) -> str:
+    configured = os.environ.get("PLATFORM_PULUMI_BIN", "pulumi")
+    if Path(configured).is_absolute():
+        return configured
+    if os.sep in configured or (os.altsep is not None and os.altsep in configured):
+        return str((repo_root / configured).resolve())
+    return configured
 
 
 def _read_json(path: Path, label: str) -> Dict[str, Any]:
@@ -296,7 +336,7 @@ def _doctor(environment: str, repo_root: Path) -> Dict[str, Any]:
     if root_lock.get("dependencies") != package_json.get("dependencies") or root_lock.get("devDependencies") != package_json.get("devDependencies"):
         raise LabError("Pulumi package-lock dependencies do not match package.json")
 
-    pulumi_version = _version([os.environ.get("PLATFORM_PULUMI_BIN", "pulumi"), "version"], r"v?(\d+\.\d+\.\d+)")
+    pulumi_version = _version([_pulumi_binary(repo_root), "version"], r"v?(\d+\.\d+\.\d+)")
     expected_pulumi = _read_text(repo_root / "tools/platform/pulumi-version.txt", "Pulumi CLI version pin")
     python_binary = os.environ.get("PLATFORM_PYTHON_BIN", "python3.14")
     python_version = _version([python_binary, "--version"], r"Python (\d+\.\d+\.\d+)")
@@ -554,11 +594,61 @@ def _create_active_run(path: Path, value: Dict[str, Any]) -> None:
 
 def _source_metadata(repo_root: Path) -> Dict[str, Any]:
     try:
-        commit = _run(["git", "rev-parse", "HEAD"], cwd=repo_root)
-        status = _run(["git", "status", "--porcelain"], cwd=repo_root)
-    except LabError:
-        return {"commit": "unknown", "worktree_clean": False}
-    return {"commit": commit, "worktree_clean": not bool(status)}
+        commit_bytes = _git_bytes(repo_root, ["rev-parse", "HEAD"])
+        status = _git_bytes(repo_root, ["status", "--porcelain=v1", "--untracked-files=all", "-z"])
+        tracked_diff = _git_bytes(
+            repo_root,
+            ["diff", "--binary", "--no-ext-diff", "HEAD", "--", *LAB_SOURCE_PATHS],
+        )
+        untracked_paths = _git_bytes(
+            repo_root,
+            ["ls-files", "--others", "--exclude-standard", "-z", "--", *LAB_SOURCE_PATHS],
+        )
+        commit = commit_bytes.decode("ascii").strip()
+    except (LabError, UnicodeError):
+        return {
+            "commit": "unknown",
+            "worktree_clean": False,
+            "worktree_sha256": hashlib.sha256(b"unknown").hexdigest(),
+        }
+    if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise LabError("Git returned an invalid source commit")
+
+    digest = hashlib.sha256()
+    digest.update(commit.encode("ascii"))
+    digest.update(b"\0")
+    digest.update(tracked_diff)
+    for relative_path in untracked_paths.split(b"\0"):
+        if not relative_path:
+            continue
+        path = repo_root / os.fsdecode(relative_path)
+        try:
+            if path.is_symlink():
+                content = os.fsencode(os.readlink(path))
+            elif path.is_file():
+                content = path.read_bytes()
+            else:
+                content = b""
+        except OSError as error:
+            raise LabError("untracked source changed while its identity was recorded") from error
+        digest.update(b"\0")
+        digest.update(relative_path)
+        digest.update(b"\0")
+        digest.update(content)
+
+    return {
+        "commit": commit,
+        "worktree_clean": not bool(status),
+        "worktree_sha256": digest.hexdigest(),
+    }
+
+
+def _assert_source_snapshot(repo_root: Path, manifest: Dict[str, Any]) -> None:
+    current_source = _source_metadata(repo_root)
+    if manifest.get("source") != current_source:
+        raise LabError(
+            "active lab run source snapshot changed; use platform-lab-down before retrying"
+        )
 
 
 def _read_active_run(repo_root: Path, requested_run_id: Optional[str]) -> Tuple[str, str, Path, Path]:
@@ -589,6 +679,25 @@ def _read_manifest(run_dir: Path, run_id: str) -> Dict[str, Any]:
     if manifest.get("environment") != "lab" or manifest.get("stack_name") != _run_stack_name(run_id):
         raise LabError("lab run manifest contains a non-lab stack identity")
     return manifest
+
+
+def _set_lab_assertion(
+    manifest: Dict[str, Any],
+    manifest_path: Path,
+    assertion: str,
+    operation: Callable[[], Any],
+) -> Any:
+    manifest[assertion] = "pending"
+    _write_json(manifest_path, manifest)
+    try:
+        result = operation()
+    except Exception:
+        manifest[assertion] = "failed"
+        _write_json(manifest_path, manifest)
+        raise
+    manifest[assertion] = "pass"
+    _write_json(manifest_path, manifest)
+    return result
 
 
 def _create_ssh_key(run_dir: Path, run_id: str) -> Tuple[Path, str]:
@@ -634,6 +743,7 @@ def _prepare_run(
     if active_path.exists():
         run_id, stack_name, run_dir, active_path = _read_active_run(repo_root, requested_run_id)
         manifest = _read_manifest(run_dir, run_id)
+        _assert_source_snapshot(repo_root, manifest)
         passphrase = _read_text(run_dir / "passphrase", "lab state passphrase")
         private_key, public_key = _create_ssh_key(run_dir, run_id)
         ssh_host_port = manifest.get("ssh_host_port")
@@ -702,9 +812,26 @@ def _prepare_run(
 
 def _pulumi_environment(run_dir: Path, passphrase: str) -> Dict[str, str]:
     environment = os.environ.copy()
+    for name in (
+        "DOCKER_AUTH_CONFIG",
+        "DOCKER_CERT_PATH",
+        "DOCKER_CONFIG",
+        "DOCKER_CONTEXT",
+        "DOCKER_HOST",
+        "DOCKER_TLS_VERIFY",
+        "PULUMI_ACCESS_TOKEN",
+        "PULUMI_API",
+        "PULUMI_BACKEND_URL",
+        "PULUMI_CONFIG_PASSPHRASE_FILE",
+        "PULUMI_CREDENTIALS_PATH",
+    ):
+        environment.pop(name, None)
+
     pulumi_home = run_dir / "pulumi-home"
     pulumi_home.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(pulumi_home, 0o700)
+    environment["PULUMI_BACKEND_URL"] = "file://" + str((run_dir / "backend").resolve())
+    environment["PULUMI_CREDENTIAL_STORE"] = "plaintext"
     environment["PULUMI_HOME"] = str(pulumi_home)
     environment["PULUMI_CONFIG_PASSPHRASE"] = passphrase
     environment["PULUMI_SKIP_UPDATE_CHECK"] = "true"
@@ -719,7 +846,7 @@ def _pulumi(
     timeout: int = 600,
 ) -> str:
     project_dir = repo_root / "infra/pulumi/docker"
-    command = [os.environ.get("PLATFORM_PULUMI_BIN", "pulumi"), *arguments]
+    command = [_pulumi_binary(repo_root), *arguments]
     return _run(command, timeout, cwd=project_dir, env=_pulumi_environment(run_dir, passphrase))
 
 
@@ -1020,12 +1147,24 @@ def _lab_up(environment: str, repo_root: Path, requested_run_id: Optional[str]) 
 
 
 
-
-
 def _lab_test(environment: str, repo_root: Path, requested_run_id: Optional[str]) -> None:
     readiness = _doctor(environment, repo_root)
-    run_id, stack_name, run_dir, _, = _read_active_run(repo_root, requested_run_id)
+    run_id, stack_name, run_dir, _ = _read_active_run(repo_root, requested_run_id)
     manifest = _read_manifest(run_dir, run_id)
+    _assert_source_snapshot(repo_root, manifest)
+    manifest_path = run_dir / "manifest.json"
+    pending_revision = manifest.get("pending_revision")
+    if pending_revision is None:
+        manifest["pulumi_noop_up"] = "pending"
+        manifest["test_stage"] = "pulumi-noop-up"
+    else:
+        manifest["test_stage"] = "resume-controlled-update"
+    if manifest.get("controlled_update") != "pass":
+        manifest["controlled_update"] = "pending"
+    manifest["ssh_validation"] = "pending"
+    manifest["last_operation"] = "test"
+    _write_json(manifest_path, manifest)
+
     ssh_host_port = manifest.get("ssh_host_port")
     if not isinstance(ssh_host_port, int) or not 1024 <= ssh_host_port <= 65535:
         raise LabError("active lab manifest has no valid reserved SSH port")
@@ -1040,71 +1179,92 @@ def _lab_test(environment: str, repo_root: Path, requested_run_id: Optional[str]
     _pulumi_login(repo_root, run_dir, passphrase)
     _pulumi_select_stack(repo_root, run_dir, passphrase, stack_name)
 
-    pending_revision = manifest.get("pending_revision")
     if pending_revision is None:
-        manifest["test_stage"] = "pulumi-noop-up"
-        _write_json(run_dir / "manifest.json", manifest)
-        _pulumi(
-            repo_root,
-            run_dir,
-            passphrase,
-            ["up", "--yes", "--expect-no-changes", "--non-interactive", "--stack", stack_name],
+        _set_lab_assertion(
+            manifest,
+            manifest_path,
+            "pulumi_noop_up",
+            lambda: _pulumi(
+                repo_root,
+                run_dir,
+                passphrase,
+                ["up", "--yes", "--expect-no-changes", "--non-interactive", "--stack", stack_name],
+            ),
         )
-        manifest["pulumi_noop_up"] = "pass"
         manifest["test_stage"] = "docker-resource-inspection"
-        _write_json(run_dir / "manifest.json", manifest)
+        _write_json(manifest_path, manifest)
         outputs = _read_lab_outputs(repo_root, run_dir, passphrase, stack_name, run_id, readiness)
         evidence = _inspect_lab_resources(readiness, outputs, run_id, manifest["revision"])
         manifest["resource_evidence"] = evidence
         manifest["test_stage"] = "ssh-validation"
-        _write_json(run_dir / "manifest.json", manifest)
-        _verify_ssh_access(run_dir, private_key, outputs)
-        manifest["ssh_validation"] = "pass"
+        _write_json(manifest_path, manifest)
+        _set_lab_assertion(
+            manifest,
+            manifest_path,
+            "ssh_validation",
+            lambda: _verify_ssh_access(run_dir, private_key, outputs),
+        )
     else:
-        manifest["test_stage"] = "resume-controlled-update"
-        _write_json(run_dir / "manifest.json", manifest)
         outputs = _read_lab_outputs(repo_root, run_dir, passphrase, stack_name, run_id, readiness)
 
     if manifest.get("controlled_update") != "pass":
         revision = 2
         manifest["pending_revision"] = revision
         manifest["test_stage"] = "controlled-update"
-        _write_json(run_dir / "manifest.json", manifest)
-        _set_lab_config(repo_root, run_dir, passphrase, stack_name, run_id, revision, readiness, public_key)
-        _pulumi(
-            repo_root,
-            run_dir,
-            passphrase,
-            ["preview", "--diff", "--non-interactive", "--stack", stack_name],
+        _write_json(manifest_path, manifest)
+
+        def apply_controlled_update() -> Tuple[Dict[str, Any], Dict[str, Any]]:
+            _set_lab_config(repo_root, run_dir, passphrase, stack_name, run_id, revision, readiness, public_key)
+            _pulumi(
+                repo_root,
+                run_dir,
+                passphrase,
+                ["preview", "--diff", "--non-interactive", "--stack", stack_name],
+            )
+            _pulumi(
+                repo_root,
+                run_dir,
+                passphrase,
+                ["up", "--yes", "--non-interactive", "--stack", stack_name],
+            )
+            manifest["test_stage"] = "controlled-update-inspection"
+            _write_json(manifest_path, manifest)
+            updated_outputs = _read_lab_outputs(repo_root, run_dir, passphrase, stack_name, run_id, readiness)
+            evidence = _inspect_lab_resources(readiness, updated_outputs, run_id, revision)
+            _set_lab_assertion(
+                manifest,
+                manifest_path,
+                "ssh_validation",
+                lambda: _verify_ssh_access(run_dir, private_key, updated_outputs),
+            )
+            manifest["revision"] = revision
+            manifest["pending_revision"] = None
+            manifest["resource_evidence"] = evidence
+            return updated_outputs, evidence
+
+        outputs, _ = _set_lab_assertion(
+            manifest,
+            manifest_path,
+            "controlled_update",
+            apply_controlled_update,
         )
-        _pulumi(
-            repo_root,
-            run_dir,
-            passphrase,
-            ["up", "--yes", "--non-interactive", "--stack", stack_name],
-        )
-        manifest["test_stage"] = "controlled-update-inspection"
-        _write_json(run_dir / "manifest.json", manifest)
-        outputs = _read_lab_outputs(repo_root, run_dir, passphrase, stack_name, run_id, readiness)
-        evidence = _inspect_lab_resources(readiness, outputs, run_id, revision)
-        _verify_ssh_access(run_dir, private_key, outputs)
-        manifest["revision"] = revision
-        manifest["pending_revision"] = None
-        manifest["controlled_update"] = "pass"
-        manifest["resource_evidence"] = evidence
-        manifest["ssh_validation"] = "pass"
     else:
         manifest["test_stage"] = "final-resource-inspection"
-        _write_json(run_dir / "manifest.json", manifest)
+        _write_json(manifest_path, manifest)
         outputs = _read_lab_outputs(repo_root, run_dir, passphrase, stack_name, run_id, readiness)
         evidence = _inspect_lab_resources(readiness, outputs, run_id, manifest["revision"])
-        _verify_ssh_access(run_dir, private_key, outputs)
+        _set_lab_assertion(
+            manifest,
+            manifest_path,
+            "ssh_validation",
+            lambda: _verify_ssh_access(run_dir, private_key, outputs),
+        )
         manifest["resource_evidence"] = evidence
-        manifest["ssh_validation"] = "pass"
+
     manifest["outputs"] = outputs
     manifest["last_operation"] = "test"
     manifest["test_stage"] = "complete"
-    _write_json(run_dir / "manifest.json", manifest)
+    _write_json(manifest_path, manifest)
     _print_lab_summary("test", run_id, stack_name, outputs)
     print("pulumi_noop_up=pass")
     print("ssh_linux=pass")

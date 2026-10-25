@@ -335,3 +335,340 @@ def test_doctor_rejects_missing_required_ansible_collection(tmp_path: Path):
     assert "community.docker" in result.stderr
     assert "5.0.0" in result.stderr
     assert "platform-doctor=pass" not in result.stdout
+
+
+def test_pulumi_environment_isolates_docker_and_backend_selection(tmp_path: Path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    monkeypatch.setenv("DOCKER_CONTEXT", "production-remote")
+    monkeypatch.setenv("DOCKER_HOST", "ssh://remote.invalid:22")
+    monkeypatch.setenv("PULUMI_BACKEND_URL", "file:///tmp/unowned-backend")
+    monkeypatch.setenv("PULUMI_HOME", "/tmp/unowned-pulumi-home")
+    monkeypatch.setenv("PULUMI_CREDENTIALS_PATH", "/tmp/unowned-credentials")
+    monkeypatch.setenv("PULUMI_CONFIG_PASSPHRASE_FILE", "/tmp/unowned-passphrase")
+    monkeypatch.setenv("PULUMI_CREDENTIAL_STORE", "os")
+
+    environment = lab_cli._pulumi_environment(run_dir, "fixture-passphrase")
+
+    assert "DOCKER_CONTEXT" not in environment
+    assert "DOCKER_HOST" not in environment
+    assert environment["PULUMI_BACKEND_URL"] == "file://" + str((run_dir / "backend").resolve())
+    assert environment["PULUMI_HOME"] == str((run_dir / "pulumi-home").resolve())
+    assert "PULUMI_CREDENTIALS_PATH" not in environment
+    assert "PULUMI_CONFIG_PASSPHRASE_FILE" not in environment
+    assert environment["PULUMI_CREDENTIAL_STORE"] == "plaintext"
+
+def test_project_relative_pulumi_binary_is_resolved_before_changing_directory(tmp_path: Path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    repo_root = tmp_path / "repo"
+    project_dir = repo_root / "infra" / "pulumi" / "docker"
+    project_dir.mkdir(parents=True)
+    pulumi_binary = repo_root / ".tools" / "platform" / "bin" / "pulumi"
+    pulumi_binary.parent.mkdir(parents=True)
+    _write_executable(pulumi_binary, "#!/bin/sh\nprintf 'v3.272.0\\n'\n")
+    monkeypatch.setenv("PLATFORM_PULUMI_BIN", ".tools/platform/bin/pulumi")
+
+    result = lab_cli._pulumi(
+        repo_root,
+        repo_root / ".artifacts" / "platform" / "lab" / "run",
+        "fixture-passphrase",
+        ["version"],
+    )
+
+    assert result == "v3.272.0"
+
+
+def test_source_fingerprint_changes_when_dirty_tracked_content_changes(tmp_path: Path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo_root, check=True)
+    source_file = repo_root / "infra" / "pulumi" / "docker" / "source.ts"
+    source_file.parent.mkdir(parents=True)
+    source_file.write_text("export const value = 1;\n", encoding="utf-8")
+    subprocess.run(["git", "add", "infra/pulumi/docker/source.ts"], cwd=repo_root, check=True)
+    git_environment = os.environ.copy()
+    git_environment.update(
+        {
+            "GIT_AUTHOR_NAME": "Fixture",
+            "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "Fixture",
+            "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+        }
+    )
+    subprocess.run(
+        ["git", "commit", "--quiet", "-m", "fixture source"],
+        cwd=repo_root,
+        env=git_environment,
+        check=True,
+    )
+
+    original = lab_cli._source_metadata(repo_root)
+    source_file.write_text("export const value = 2;\n", encoding="utf-8")
+    modified = lab_cli._source_metadata(repo_root)
+
+    assert original["commit"] == modified["commit"]
+    assert original["worktree_clean"] is True
+    assert modified["worktree_clean"] is False
+    assert original["worktree_sha256"] != modified["worktree_sha256"]
+
+
+def test_source_fingerprint_includes_untracked_file_contents(tmp_path: Path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo_root, check=True)
+    tracked_file = repo_root / "infra" / "pulumi" / "docker" / "tracked.ts"
+    tracked_file.parent.mkdir(parents=True)
+    tracked_file.write_text("export const tracked = true;\n", encoding="utf-8")
+    subprocess.run(["git", "add", "infra/pulumi/docker/tracked.ts"], cwd=repo_root, check=True)
+    git_environment = os.environ.copy()
+    git_environment.update(
+        {
+            "GIT_AUTHOR_NAME": "Fixture",
+            "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "Fixture",
+            "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+        }
+    )
+    subprocess.run(
+        ["git", "commit", "--quiet", "-m", "fixture source"],
+        cwd=repo_root,
+        env=git_environment,
+        check=True,
+    )
+
+    untracked_file = repo_root / "infra" / "pulumi" / "docker" / "untracked.ts"
+    untracked_file.write_text("export const untracked = 1;\n", encoding="utf-8")
+    first = lab_cli._source_metadata(repo_root)
+    untracked_file.write_text("export const untracked = 2;\n", encoding="utf-8")
+    second = lab_cli._source_metadata(repo_root)
+
+    assert first["commit"] == second["commit"]
+    assert first["worktree_sha256"] != second["worktree_sha256"]
+
+    unrelated_file = repo_root / "private-note.txt"
+    unrelated_file.write_text("not part of the lab source inputs\n", encoding="utf-8")
+    unrelated = lab_cli._source_metadata(repo_root)
+
+    assert unrelated["worktree_sha256"] == second["worktree_sha256"]
+
+
+@pytest.mark.parametrize(
+    "current_source",
+    [
+        {"commit": "b" * 40, "worktree_clean": False, "worktree_sha256": "b" * 64},
+        {"commit": "a" * 40, "worktree_clean": False, "worktree_sha256": "b" * 64},
+    ],
+    ids=["commit-changed", "dirty-source-changed"],
+)
+def test_lab_up_refuses_to_resume_a_different_source_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+    current_source: dict[str, object],
+):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    run_id = "20261025T123456Z-12345678"
+    stack_name = "platform-lab-" + run_id
+    artifact_root = tmp_path / ".artifacts" / "platform" / "lab"
+    run_dir = artifact_root / run_id
+    run_dir.mkdir(parents=True)
+    active_path = artifact_root / "active-run.json"
+    active_path.write_text(
+        json.dumps(
+            {
+                "schema_version": lab_cli.ACTIVE_RUN_SCHEMA,
+                "run_id": run_id,
+                "stack_name": stack_name,
+            }
+        ),
+        encoding="utf-8",
+    )
+    old_source = {"commit": "a" * 40, "worktree_clean": False, "worktree_sha256": "a" * 64}
+    (run_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": lab_cli.LAB_RUN_SCHEMA,
+                "environment": "lab",
+                "run_id": run_id,
+                "stack_name": stack_name,
+                "source": old_source,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(lab_cli, "_source_metadata", lambda repo_root: current_source)
+
+    with pytest.raises(lab_cli.LabError, match="source snapshot"):
+        lab_cli._prepare_run(tmp_path, None, {})
+
+
+def test_failed_ssh_revalidation_persists_failed_status_not_previous_pass(
+    tmp_path: Path,
+    monkeypatch,
+):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    run_id = "20261025T123456Z-12345678"
+    stack_name = "platform-lab-" + run_id
+    artifact_root = tmp_path / ".artifacts" / "platform" / "lab"
+    run_dir = artifact_root / run_id
+    ssh_dir = run_dir / "ssh"
+    ssh_dir.mkdir(parents=True)
+    active_path = artifact_root / "active-run.json"
+    active_path.write_text(
+        json.dumps(
+            {
+                "schema_version": lab_cli.ACTIVE_RUN_SCHEMA,
+                "run_id": run_id,
+                "stack_name": stack_name,
+            }
+        ),
+        encoding="utf-8",
+    )
+    source = {"commit": "a" * 40, "worktree_clean": False, "worktree_sha256": "a" * 64}
+    manifest_path = run_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": lab_cli.LAB_RUN_SCHEMA,
+                "environment": "lab",
+                "run_id": run_id,
+                "stack_name": stack_name,
+                "source": source,
+                "ssh_host_port": 44299,
+                "pulumi_up": "pass",
+                "pending_revision": None,
+                "revision": 1,
+                "pulumi_noop_up": "pass",
+                "ssh_validation": "pass",
+                "controlled_update": "pass",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "passphrase").write_text("fixture-passphrase", encoding="utf-8")
+    (ssh_dir / "id_ed25519").write_text("fixture-private-key", encoding="utf-8")
+    (ssh_dir / "id_ed25519.pub").write_text("ssh-ed25519 AAAA fixture\n", encoding="utf-8")
+
+    monkeypatch.setattr(lab_cli, "_doctor", lambda environment, repo_root: {"report": []})
+    monkeypatch.setattr(lab_cli, "_source_metadata", lambda repo_root: source)
+    monkeypatch.setattr(lab_cli, "_pulumi_login", lambda *args: None)
+    monkeypatch.setattr(lab_cli, "_pulumi_select_stack", lambda *args: None)
+    monkeypatch.setattr(lab_cli, "_pulumi", lambda *args, **kwargs: "")
+    monkeypatch.setattr(lab_cli, "_read_lab_outputs", lambda *args: {"ssh_host_port": 44299})
+    monkeypatch.setattr(lab_cli, "_inspect_lab_resources", lambda *args: {})
+    monkeypatch.setattr(
+        lab_cli,
+        "_verify_ssh_access",
+        lambda *args: (_ for _ in ()).throw(lab_cli.LabError("fixture SSH timeout")),
+    )
+    monkeypatch.setattr(
+        lab_cli,
+        "_write_json",
+        lambda path, value: path.write_text(json.dumps(value), encoding="utf-8"),
+    )
+
+    with pytest.raises(lab_cli.LabError, match="fixture SSH timeout"):
+        lab_cli._lab_test("lab", tmp_path, None)
+
+    persisted = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert persisted["pulumi_noop_up"] == "pass"
+    assert persisted["ssh_validation"] == "failed"
+    assert persisted["controlled_update"] == "pass"
+
+
+def test_lab_test_refuses_changed_source_before_pulumi(tmp_path: Path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    run_id = "20261025T123456Z-12345678"
+    stack_name = "platform-lab-" + run_id
+    artifact_root = tmp_path / ".artifacts" / "platform" / "lab"
+    run_dir = artifact_root / run_id
+    run_dir.mkdir(parents=True)
+    (artifact_root / "active-run.json").write_text(
+        json.dumps(
+            {
+                "schema_version": lab_cli.ACTIVE_RUN_SCHEMA,
+                "run_id": run_id,
+                "stack_name": stack_name,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": lab_cli.LAB_RUN_SCHEMA,
+                "environment": "lab",
+                "run_id": run_id,
+                "stack_name": stack_name,
+                "source": {
+                    "commit": "a" * 40,
+                    "worktree_clean": True,
+                    "worktree_sha256": "a" * 64,
+                },
+                "ssh_host_port": 44299,
+                "pulumi_up": "pass",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(lab_cli, "_doctor", lambda environment, repo_root: {"report": []})
+    monkeypatch.setattr(
+        lab_cli,
+        "_source_metadata",
+        lambda repo_root: {
+            "commit": "b" * 40,
+            "worktree_clean": True,
+            "worktree_sha256": "b" * 64,
+        },
+    )
+    pulumi_calls = []
+    monkeypatch.setattr(lab_cli, "_pulumi", lambda *args, **kwargs: pulumi_calls.append(args))
+
+    with pytest.raises(lab_cli.LabError, match="source snapshot"):
+        lab_cli._lab_test("lab", tmp_path, None)
+
+    assert pulumi_calls == []

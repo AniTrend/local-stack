@@ -136,7 +136,8 @@
       "required": ["commit", "worktree_clean"],
       "properties": {
         "commit": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|unknown)$"},
-        "worktree_clean": {"type": "boolean"}
+        "worktree_clean": {"type": "boolean"},
+        "worktree_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
       }
     },
     "resourceEvidence": {
