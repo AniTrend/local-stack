@@ -479,6 +479,108 @@ def test_source_fingerprint_includes_untracked_file_contents(tmp_path: Path):
     assert unrelated["worktree_sha256"] == second["worktree_sha256"]
 
 
+def test_source_snapshot_rejects_unknown_git_identity_on_resume(tmp_path: Path):
+    import hashlib
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    repo_root = tmp_path / "source"
+    repo_root.mkdir()
+    unknown_source = {
+        "commit": "unknown",
+        "worktree_clean": False,
+        "worktree_sha256": hashlib.sha256(b"unknown").hexdigest(),
+    }
+
+    with pytest.raises(lab_cli.LabError, match="Git source identity"):
+        lab_cli._assert_source_snapshot(repo_root, {"source": unknown_source})
+
+
+def test_lab_up_rejects_new_run_without_git_source_identity(tmp_path: Path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    repo_root = tmp_path / "source"
+    repo_root.mkdir()
+    run_id = "20261025T123456Z-12345678"
+    artifact_root = repo_root / ".artifacts" / "platform" / "lab"
+    run_dir = artifact_root / run_id
+    monkeypatch.setattr(lab_cli, "_reserve_loopback_port", lambda: 44299)
+    monkeypatch.setattr(
+        lab_cli,
+        "_create_ssh_key",
+        lambda run_dir, run_id: (run_dir / "ssh" / "id_ed25519", "ssh-ed25519 AAAA fixture"),
+    )
+    monkeypatch.setattr(
+        lab_cli,
+        "_write_json",
+        lambda path, value: path.write_text(json.dumps(value), encoding="utf-8"),
+    )
+    readiness = {
+        "image_ref": "fixture@sha256:" + "a" * 64,
+        "image_digest": "sha256:" + "a" * 64,
+        "image_platform": "linux/amd64",
+        "execution_mode": "native",
+        "tool_versions": {},
+    }
+
+    with pytest.raises(lab_cli.LabError, match="Git source identity"):
+        lab_cli._prepare_run(repo_root, run_id, readiness)
+
+    assert not run_dir.exists()
+    assert not (artifact_root / "active-run.json").exists()
+
+
+def test_unrelated_worktree_change_does_not_block_source_resume(tmp_path: Path):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("platform_lab_cli", LAB_CLI)
+    assert spec is not None and spec.loader is not None
+    lab_cli = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(lab_cli)
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    subprocess.run(["git", "init", "--quiet"], cwd=repo_root, check=True)
+    source_file = repo_root / "infra" / "pulumi" / "docker" / "source.ts"
+    source_file.parent.mkdir(parents=True)
+    source_file.write_text("export const value = 1;\n", encoding="utf-8")
+    subprocess.run(["git", "add", "infra/pulumi/docker/source.ts"], cwd=repo_root, check=True)
+    git_environment = os.environ.copy()
+    git_environment.update(
+        {
+            "GIT_AUTHOR_NAME": "Fixture",
+            "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+            "GIT_COMMITTER_NAME": "Fixture",
+            "GIT_COMMITTER_EMAIL": "fixture@example.invalid",
+        }
+    )
+    subprocess.run(
+        ["git", "commit", "--quiet", "-m", "fixture source"],
+        cwd=repo_root,
+        env=git_environment,
+        check=True,
+    )
+    original_source = lab_cli._source_metadata(repo_root)
+    assert original_source["worktree_clean"] is True
+
+    (repo_root / "private-note.txt").write_text("unrelated worktree change\n", encoding="utf-8")
+    current_source = lab_cli._source_metadata(repo_root)
+
+    assert current_source["worktree_clean"] is False
+    assert current_source["commit"] == original_source["commit"]
+    assert current_source["worktree_sha256"] == original_source["worktree_sha256"]
+    lab_cli._assert_source_snapshot(repo_root, {"source": original_source})
+
+
 @pytest.mark.parametrize(
     "current_source",
     [

@@ -54,7 +54,7 @@ make platform-lab-down ENV=lab
 
 `platform-lab-up` generates a UTC run ID, a temporary SSH keypair, a passphrase-protected local Pulumi stack, and uniquely labelled resources. It previews and applies the stack; a container healthcheck waits for the SSH listener before the command returns. `platform-lab-test` requires the second identical update to report no changes, inspects actual Docker state, verifies loopback-only SSH access and `uname -s`, changes the resource revision label, and verifies the controlled update. `platform-lab-down` verifies the Pulumi resource inventory and Docker ownership labels before destroying the active stack, then verifies removal. It never invokes Docker prune or removes unrelated resources.
 
-Only one lifecycle operation per checkout runs at a time. The run ID and stack name are printed by `up`; `test` and `down` use the active run record. An interrupted run can be reconciled with `make platform-lab-up ENV=lab` only from the identical source snapshot. If lab inputs changed, or the active manifest predates source fingerprints, run `make platform-lab-down ENV=lab` to clean the old stack before creating a new run.
+Only one lifecycle operation per checkout runs at a time. The run ID and stack name are printed by `up`; `test` and `down` use the active run record. An interrupted run can be reconciled with `make platform-lab-up ENV=lab` only from the same commit and lab-input fingerprint. Changes outside the lab input set do not block resume. If lab inputs changed, or the active manifest predates source fingerprints, run `make platform-lab-down ENV=lab` to clean the old stack before creating a new run.
 
 This local lab tests only the Docker Pulumi provider and the disposable SSH fixture. It requires the pinned toolchain and an explicitly allowlisted local Docker daemon. It does not provision HCloud resources or prove VM, rehearsal, or production readiness.
 
@@ -66,7 +66,7 @@ The image is pinned by digest and selected for `linux/amd64` or `linux/arm64`. T
 
 ## Local evidence and separate tiers
 
-The sanitized run manifest is retained at `.artifacts/platform/lab/<run-id>/manifest.json`. It records the source commit, worktree cleanliness, and a SHA-256 fingerprint of tracked lab inputs and untracked lab source files. Resume is refused if that source snapshot changes. It also records tool versions, host/daemon/image architecture, digest, resource names, no-op/update/SSH results, and cleanup status. It excludes the local Docker socket path, passphrase, and SSH private key. Successful teardown removes the private key, passphrase, local backend, and active-run pointer; the manifest remains ignored by Git.
+The sanitized run manifest is retained at `.artifacts/platform/lab/<run-id>/manifest.json`. It records the source commit, Git worktree cleanliness for context, and a SHA-256 fingerprint of tracked lab inputs and untracked lab source files. Resume compares the commit and input fingerprint, not the cleanliness flag; unrelated files outside the input set do not block resume. It also records tool versions, host/daemon/image architecture, digest, resource names, no-op/update/SSH results, and cleanup status. It excludes the local Docker socket path, passphrase, and SSH private key. Successful teardown removes the private key, passphrase, local backend, and active-run pointer; the manifest remains ignored by Git.
 
 `infra/pulumi/shared/platform-lab.schema.json` defines the lab output and run-manifest schemas. The CLI validates Pulumi outputs and each manifest write against this contract.
 

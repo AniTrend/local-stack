@@ -605,12 +605,8 @@ def _source_metadata(repo_root: Path) -> Dict[str, Any]:
             ["ls-files", "--others", "--exclude-standard", "-z", "--", *LAB_SOURCE_PATHS],
         )
         commit = commit_bytes.decode("ascii").strip()
-    except (LabError, UnicodeError):
-        return {
-            "commit": "unknown",
-            "worktree_clean": False,
-            "worktree_sha256": hashlib.sha256(b"unknown").hexdigest(),
-        }
+    except (LabError, UnicodeError) as error:
+        raise LabError("Git source identity is unavailable") from error
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
         raise LabError("Git returned an invalid source commit")
 
@@ -645,7 +641,12 @@ def _source_metadata(repo_root: Path) -> Dict[str, Any]:
 
 def _assert_source_snapshot(repo_root: Path, manifest: Dict[str, Any]) -> None:
     current_source = _source_metadata(repo_root)
-    if manifest.get("source") != current_source:
+    source = manifest.get("source")
+    if (
+        not isinstance(source, dict)
+        or source.get("commit") != current_source["commit"]
+        or source.get("worktree_sha256") != current_source["worktree_sha256"]
+    ):
         raise LabError(
             "active lab run source snapshot changed; use platform-lab-down before retrying"
         )
