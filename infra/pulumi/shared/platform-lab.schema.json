@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AniTrend platform lab evidence",
+  "$defs": {
+    "runId": {
+      "type": "string",
+      "pattern": "^\\d{8}T\\d{6}Z-[0-9a-f]{8}$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "imageRef": {
+      "type": "string",
+      "pattern": "^.+@sha256:[0-9a-f]{64}$"
+    },
+    "imagePlatform": {
+      "type": "string",
+      "enum": ["linux/amd64", "linux/arm64"]
+    },
+    "executionMode": {
+      "type": "string",
+      "enum": ["native", "emulated"]
+    },
+    "hostOs": {
+      "type": "string",
+      "enum": ["Linux", "Darwin"]
+    },
+    "architecture": {
+      "type": "string",
+      "enum": ["x86_64", "amd64", "aarch64", "arm64"]
+    },
+    "toolVersions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "npm",
+        "pulumi",
+        "python",
+        "ansible-core",
+        "molecule",
+        "molecule-plugins",
+        "jsonschema"
+      ],
+      "properties": {
+        "node": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "npm": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "pulumi": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "python": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "ansible-core": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "molecule": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "molecule-plugins": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+        "jsonschema": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"}
+      }
+    },
+    "labOutput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "environment",
+        "run_id",
+        "network_name",
+        "volume_name",
+        "container_name",
+        "ssh_host_port",
+        "image_ref",
+        "image_digest",
+        "image_id",
+        "image_platform",
+        "host_os",
+        "host_architecture",
+        "docker_os",
+        "docker_architecture",
+        "execution_mode"
+      ],
+      "properties": {
+        "schema_version": {"const": "anitrend.platform.lab-output.v1"},
+        "environment": {"const": "lab"},
+        "run_id": {"$ref": "#/$defs/runId"},
+        "network_name": {"type": "string", "pattern": "^anitrend-platform-lab-\\d{8}T\\d{6}Z-[0-9a-f]{8}-network$"},
+        "volume_name": {"type": "string", "pattern": "^anitrend-platform-lab-\\d{8}T\\d{6}Z-[0-9a-f]{8}-config$"},
+        "container_name": {"type": "string", "pattern": "^anitrend-platform-lab-\\d{8}T\\d{6}Z-[0-9a-f]{8}-ssh$"},
+        "ssh_host_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+        "image_ref": {"$ref": "#/$defs/imageRef"},
+        "image_digest": {"$ref": "#/$defs/digest"},
+        "image_id": {"$ref": "#/$defs/digest"},
+        "image_platform": {"$ref": "#/$defs/imagePlatform"},
+        "host_os": {"$ref": "#/$defs/hostOs"},
+        "host_architecture": {"$ref": "#/$defs/architecture"},
+        "docker_os": {"type": "string", "minLength": 1},
+        "docker_architecture": {"$ref": "#/$defs/architecture"},
+        "execution_mode": {"$ref": "#/$defs/executionMode"}
+      }
+    },
+    "environmentFacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "docker_context",
+        "docker_endpoint_kind",
+        "host_os",
+        "host_architecture",
+        "docker_os",
+        "docker_architecture",
+        "image_ref",
+        "image_digest",
+        "image_platform",
+        "execution_mode",
+        "ssh_container_port",
+        "ssh_host_port",
+        "tool_versions",
+        "report"
+      ],
+      "properties": {
+        "docker_context": {"type": "string", "minLength": 1},
+        "docker_endpoint_kind": {"type": "string", "enum": ["local_unix", "local_npipe"]},
+        "host_os": {"$ref": "#/$defs/hostOs"},
+        "host_architecture": {"$ref": "#/$defs/architecture"},
+        "docker_os": {"type": "string", "minLength": 1},
+        "docker_architecture": {"$ref": "#/$defs/architecture"},
+        "image_ref": {"$ref": "#/$defs/imageRef"},
+        "image_digest": {"$ref": "#/$defs/digest"},
+        "image_platform": {"$ref": "#/$defs/imagePlatform"},
+        "execution_mode": {"$ref": "#/$defs/executionMode"},
+        "ssh_container_port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "ssh_host_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+        "tool_versions": {"$ref": "#/$defs/toolVersions"},
+        "report": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "worktree_clean"],
+      "properties": {
+        "commit": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|unknown)$"},
+        "worktree_clean": {"type": "boolean"}
+      }
+    },
+    "resourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["container_id", "image_id", "architecture"],
+      "properties": {
+        "container_id": {"type": ["string", "null"]},
+        "image_id": {"$ref": "#/$defs/digest"},
+        "architecture": {"$ref": "#/$defs/architecture"}
+      }
+    },
+    "labRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "environment",
+        "run_id",
+        "stack_name",
+        "created_at",
+        "source",
+        "environment_facts",
+        "image_ref",
+        "image_digest",
+        "image_platform",
+        "execution_mode",
+        "tool_versions",
+        "pulumi_stack_created",
+        "ssh_host_port",
+        "revision",
+        "pulumi_preview",
+        "pulumi_up",
+        "pulumi_noop_up",
+        "ssh_validation",
+        "controlled_update",
+        "cleanup_status",
+        "outputs"
+      ],
+      "properties": {
+        "schema_version": {"const": "anitrend.platform.lab-run.v1"},
+        "environment": {"const": "lab"},
+        "run_id": {"$ref": "#/$defs/runId"},
+        "stack_name": {"type": "string", "pattern": "^platform-lab-\\d{8}T\\d{6}Z-[0-9a-f]{8}$"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "source": {"$ref": "#/$defs/source"},
+        "environment_facts": {"$ref": "#/$defs/environmentFacts"},
+        "image_ref": {"$ref": "#/$defs/imageRef"},
+        "image_digest": {"$ref": "#/$defs/digest"},
+        "image_platform": {"$ref": "#/$defs/imagePlatform"},
+        "execution_mode": {"$ref": "#/$defs/executionMode"},
+        "tool_versions": {"$ref": "#/$defs/toolVersions"},
+        "pulumi_stack_created": {"type": "boolean"},
+        "ssh_host_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+        "revision": {"type": "integer", "minimum": 1},
+        "pending_revision": {"type": ["integer", "null"], "minimum": 1},
+        "pulumi_preview": {"type": "string", "enum": ["pending", "pass", "failed"]},
+        "pulumi_up": {"type": "string", "enum": ["pending", "pass", "failed"]},
+        "pulumi_noop_up": {"type": "string", "enum": ["pending", "pass", "failed"]},
+        "ssh_validation": {"type": "string", "enum": ["pending", "pass", "failed"]},
+        "controlled_update": {"type": "string", "enum": ["pending", "pass", "failed"]},
+        "cleanup_status": {"type": "string", "enum": ["pending", "pass", "failed"]},
+        "outputs": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/labOutput"}]},
+        "resource_evidence": {"$ref": "#/$defs/resourceEvidence"},
+        "last_operation": {"type": "string", "enum": ["up", "test", "down"]},
+        "test_stage": {
+          "type": "string",
+          "enum": [
+            "pulumi-noop-up",
+            "docker-resource-inspection",
+            "ssh-validation",
+            "resume-controlled-update",
+            "controlled-update",
+            "controlled-update-inspection",
+            "final-resource-inspection",
+            "complete"
+          ]
+        }
+      }
+    }
+  }
+}

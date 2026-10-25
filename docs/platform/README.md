@@ -9,9 +9,10 @@ The goal is to provision, update, inspect and recover AniTrend's private platfor
 1. [Current repository state and inventory gaps](current-state.md).
 2. [ADR 0001: platform ownership and defaults](adr-0001-platform-ownership.md).
 3. [Validation tiers and command contract](validation.md).
-4. [Migration, recovery and rollback runbook](migration-runbook.md).
-5. [Agent execution contract](agent-execution.md).
-6. [Primary references](sources.md) and [machine-readable work graph](work-items.json).
+4. [Local Docker lab runbook](local-lab.md).
+5. [Migration, recovery and rollback runbook](migration-runbook.md).
+6. [Agent execution contract](agent-execution.md).
+7. [Primary references](sources.md) and [machine-readable work graph](work-items.json).
 
 These repository documents are the source of truth for implementation. The earlier research discussion is background, not a required input. Issues record work scope and acceptance; they link to this plan and each other. Before changing a decision, update the relevant ADR and affected acceptance criteria in the same reviewed change.
 

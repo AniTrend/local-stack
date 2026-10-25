@@ -41,3 +41,7 @@ docker stack deploy -c .rendered/docker-compose.infrastructure.rendered.yml infr
 
 - This is a preprocessing step; paths remain relative to the original file location.
 - It does not evaluate command substitutions or complex expressions, only variable substitution.
+
+## Platform infrastructure helpers
+
+`tools/platform/lab.py` owns the disposable local Docker Pulumi lifecycle. It validates the selected daemon, creates uniquely labelled resources, exercises SSH and controlled updates, and removes only the active lab stack. See [the platform lab runbook](../docs/platform/local-lab.md).
