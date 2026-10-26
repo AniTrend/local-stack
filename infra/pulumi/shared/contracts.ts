@@ -147,3 +147,29 @@ export interface PulumiInventory {
   ttl_hours: number | null;
   readiness: "ready" | "blocked" | "failed";
 }
+
+export interface PulumiLabVmHostInventory {
+  resource_id: string;
+  name: string;
+  bootstrap_user: string;
+  connect_address: string;
+  architecture: "amd64" | "arm64";
+  os_image: string;
+  expected_host_identity_ref: string;
+}
+
+export interface PulumiLabVmInventory {
+  schema_version: "anitrend.platform.pulumi-inventory.lab-v1";
+  environment: "lab";
+  stack_identity: string;
+  provider: "external-vm";
+  ssh_source_cidrs: string[];
+  hosts: PulumiLabVmHostInventory[];
+  volumes: PulumiVolumeInventory[];
+  architecture: "amd64" | "arm64";
+  image_ref: string;
+  native_execution: true;
+  readiness: "ready" | "blocked" | "failed";
+}
+
+export type VersionedHostInventory = PulumiInventory | PulumiLabVmInventory;

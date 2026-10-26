@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:anitrend:platform:ssh-host-trust:v1",
+  "title": "AniTrend authenticated SSH host trust record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "environment", "identity_ref", "trust_type", "host"],
+  "properties": {
+    "schema_version": { "const": "anitrend.platform.ssh-host-trust.v1" },
+    "environment": { "enum": ["lab", "rehearsal", "production"] },
+    "identity_ref": { "type": "string", "minLength": 1 },
+    "trust_type": { "enum": ["host_key", "host_ca"] },
+    "host": { "$ref": "#/$defs/host" }
+  },
+  "$defs": {
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "public_key", "fingerprint_sha256"],
+      "properties": {
+        "address": {
+          "oneOf": [
+            { "type": "string", "format": "ipv4" },
+            { "type": "string", "format": "ipv6" }
+          ]
+        },
+        "public_key": {
+          "type": "string",
+          "pattern": "^ssh-ed25519 [A-Za-z0-9+/]+={0,2}$"
+        },
+        "fingerprint_sha256": {
+          "type": "string",
+          "pattern": "^SHA256:[A-Za-z0-9+/]{43}$"
+        }
+      }
+    }
+  }
+}

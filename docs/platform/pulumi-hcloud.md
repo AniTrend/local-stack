@@ -30,7 +30,11 @@ Each server supports at most 16 volumes, with sizes from 10 GB to 10,000 GB and 
 
 The `inventory` export is validated against `infra/pulumi/shared/pulumi-inventory.schema.json` before publication. It includes stable provider IDs, host addresses and bootstrap user, private addresses, architecture, image reference, SSH key references and target identity reference, the validated inbound firewall policy, and volume device, filesystem and mount path. It excludes the HCloud token, SSH public-key material, and private keys.
 
-`readiness: ready` means the Pulumi resource outputs and HCloud preflight checks completed. It does not prove the guest is reachable, the operating system has converged, or the SSH host key has been verified. `target_host_identity_ref` is an external reference for the Ansible trust step, not a fingerprint attested by Pulumi. P1-03 must verify host identity before establishing SSH trust; the inventory's `bootstrap_user`, firewall policy, and volume filesystem are inputs to that baseline, not completion evidence.
+`readiness: ready` means the Pulumi resource outputs and HCloud preflight checks completed. It does not prove the guest is reachable, the operating system has converged, or the SSH host key has been verified. `target_host_identity_ref` is an external reference for the Ansible trust step, not a fingerprint attested by Pulumi.
+
+P1-03 consumes this inventory with the separate versioned trust record validated by `infra/pulumi/shared/ssh-host-trust.schema.json`. The adapter requires exact environment, identity-reference, address and SHA-256 fingerprint matches, then writes a mode-0600 `known_hosts` file and uses `StrictHostKeyChecking=yes`. `host_key` pins one exact key; `host_ca` writes an `@cert-authority` entry scoped to the exact address and requires the VM to present a certificate signed by that CA. Never establish trust with `ssh-keyscan`.
+
+For HCloud, bootstrap host-key trust through the authenticated [Hetzner VNC console](https://docs.hetzner.com/cloud/servers/getting-started/vnc-console/): inspect `/etc/ssh/ssh_host_ed25519_key.pub` and its fingerprint with `ssh-keygen -lf`, then store the verified public record under the configured identity reference. For the lab-VM variant, use the VM owner's authenticated hypervisor or console path. The adapter does not connect to the host, fetch keys, or mutate the VM.
 
 ## State and preview
 

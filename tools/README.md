@@ -45,3 +45,7 @@ docker stack deploy -c .rendered/docker-compose.infrastructure.rendered.yml infr
 ## Platform infrastructure helpers
 
 `tools/platform/lab.py` owns the disposable local Docker Pulumi lifecycle. `tools/platform/pulumi_preview.py` previews the active local lab or an already configured HCloud stack without applying changes. `make platform-pulumi-test ENV=lab` runs Docker and HCloud Pulumi mocks plus platform Python tests. See [the local lab runbook](../docs/platform/local-lab.md) and [HCloud provisioning contract](../docs/platform/pulumi-hcloud.md).
+
+`tools/platform/ansible_inventory.py` validates the HCloud inventory v1 or the versioned external lab-VM inventory together with an authenticated SSH host-trust record. It writes a sanitized Ansible inventory and strict `known_hosts` file under a new ignored `.artifacts/platform/<run-id>` directory; it does not connect to or mutate the host. The lab-VM inventory describes an externally provided native VM and does not provision one.
+
+Run `python3 tools/platform/ansible_inventory.py --inventory FILE --trust-bundle FILE --environment lab|rehearsal|production --output-dir .artifacts/platform/RUN_ID/ansible` to validate the HCloud v1 or external lab-VM inventory and the versioned SSH trust record. The output directory must be new. The helper emits only the selected Ansible host variables and a mode-0600 `known_hosts` file; it never scans the network, connects to a host, or mutates infrastructure.
