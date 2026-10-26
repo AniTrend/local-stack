@@ -14,6 +14,9 @@ import shlex
 import sys
 from pathlib import Path
 
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import jsonschema
 
 
@@ -48,6 +51,28 @@ def _validate_document(value: object, name: str, schema_path: Path) -> None:
     if errors:
         location = "/" + "/".join(str(part) for part in errors[0].absolute_path)
         raise InventoryError(f"{name} failed schema validation at {location}")
+
+
+def _verify_trust_signature(
+    trust_value: dict[str, object],
+    trust_root_public_key: Ed25519PublicKey,
+) -> None:
+    signature_text = trust_value["signature"]
+    if not isinstance(signature_text, str):
+        raise InventoryError("SSH host trust signature is malformed")
+    try:
+        signature = base64.b64decode(signature_text, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise InventoryError("SSH host trust signature is malformed") from error
+    if len(signature) != 64:
+        raise InventoryError("SSH host trust signature is malformed")
+
+    signed_payload = {key: value for key, value in trust_value.items() if key != "signature"}
+    message = json.dumps(signed_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    try:
+        trust_root_public_key.verify(signature, message)
+    except InvalidSignature as error:
+        raise InventoryError("SSH host trust signature verification failed") from error
 
 
 def _decode_ed25519_fingerprint(public_key: str) -> str:
@@ -101,6 +126,7 @@ def prepare_inventory(
     trust_value: object,
     expected_environment: str,
     known_hosts_path: Path,
+    trust_root_public_key: Ed25519PublicKey,
 ) -> dict[str, object]:
     if not isinstance(inventory_value, dict):
         raise InventoryError("platform inventory must be a JSON object")
@@ -120,6 +146,7 @@ def prepare_inventory(
     if trust_value.get("schema_version") != SSH_HOST_TRUST_VERSION:
         raise InventoryError("unsupported SSH host trust schema version")
     _validate_document(trust_value, "SSH host trust", SSH_HOST_TRUST_SCHEMA)
+    _verify_trust_signature(trust_value, trust_root_public_key)
 
     environment = inventory_value["environment"]
     if environment != expected_environment:
@@ -169,10 +196,15 @@ def prepare_inventory(
     if fingerprint != trust_value["host"]["fingerprint_sha256"]:
         raise InventoryError("SSH host trust fingerprint does not match its public key")
 
+    known_hosts_text = str(known_hosts_path)
+    if any(character in known_hosts_text for character in ("\0", "\n", "\r")):
+        raise InventoryError("known_hosts path contains unsupported control characters")
+    ssh_config_path = known_hosts_text.replace("\\", "\\\\").replace('"', '\\"')
+    user_known_hosts_option = shlex.quote(f'UserKnownHostsFile="{ssh_config_path}"')
     ssh_args = " ".join(
         (
             "-o StrictHostKeyChecking=yes",
-            f"-o UserKnownHostsFile={shlex.quote(str(known_hosts_path))}",
+            f"-o {user_known_hosts_option}",
             "-o GlobalKnownHostsFile=/dev/null",
             "-o IdentitiesOnly=yes",
         )
@@ -182,7 +214,10 @@ def prepare_inventory(
         "ansible_host": inventory_address,
         "ansible_port": 22,
         "ansible_user": host["bootstrap_user"],
-        "ansible_ssh_common_args": ssh_args,
+        "ansible_host_key_checking": True,
+        "ansible_ssh_args": ssh_args,
+        "ansible_ssh_common_args": "",
+        "ansible_ssh_extra_args": "",
         "platform_environment": environment,
         "platform_inventory_schema_version": schema_version,
         "platform_provider": inventory_value["provider"],
@@ -198,8 +233,15 @@ def prepare_inventory(
     _write_private_file(known_hosts_path, known_hosts_line)
 
     return {
-        "all": {"children": {"platform_target": {"hosts": ["platform-target"]}}},
-        "_meta": {"hostvars": {"platform-target": host_vars}},
+        "all": {
+            "children": {
+                "platform_target": {
+                    "hosts": {
+                        "platform-target": host_vars,
+                    }
+                }
+            }
+        }
     }
 
 
@@ -208,6 +250,16 @@ def _read_json(path: Path, description: str) -> object:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise InventoryError(f"cannot read {description} JSON") from error
+
+def _load_trust_root(path: Path) -> Ed25519PublicKey:
+    try:
+        public_key = load_pem_public_key(path.read_bytes())
+    except (OSError, ValueError, UnsupportedAlgorithm) as error:
+        raise InventoryError("cannot load the separate SSH trust root") from error
+    if not isinstance(public_key, Ed25519PublicKey):
+        raise InventoryError("SSH trust root must be an Ed25519 public key")
+    return public_key
+
 
 
 def _write_inventory(path: Path, inventory: dict[str, object]) -> None:
@@ -221,6 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--trust-bundle", required=True, type=Path)
     parser.add_argument("--environment", required=True, choices=("lab", "rehearsal", "production"))
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--trust-root", required=True, type=Path)
     args = parser.parse_args(argv)
 
     try:
@@ -232,8 +285,17 @@ def main(argv: list[str] | None = None) -> int:
             raise InventoryError("refusing to reuse an existing Ansible output directory")
         inventory_value = _read_json(args.inventory, "platform inventory")
         trust_value = _read_json(args.trust_bundle, "SSH host trust")
+        if args.trust_root.resolve() == args.trust_bundle.resolve():
+            raise InventoryError("SSH trust root must be supplied separately from the signed host trust bundle")
         known_hosts_path = output_dir / "known_hosts"
-        prepared = prepare_inventory(inventory_value, trust_value, args.environment, known_hosts_path)
+        trust_root_public_key = _load_trust_root(args.trust_root)
+        prepared = prepare_inventory(
+            inventory_value,
+            trust_value,
+            args.environment,
+            known_hosts_path,
+            trust_root_public_key,
+        )
         _write_inventory(output_dir / "inventory.json", prepared)
     except InventoryError as error:
         print(f"ansible inventory: {error}", file=sys.stderr)

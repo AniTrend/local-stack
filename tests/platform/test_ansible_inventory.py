@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import shlex
+import shutil
+import subprocess
 import stat
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from tools.platform.ansible_inventory import prepare_inventory
+
+
+TRUST_SIGNER = Ed25519PrivateKey.generate()
+TRUST_ROOT = TRUST_SIGNER.public_key()
 
 
 PUBLIC_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
@@ -93,31 +102,50 @@ def hcloud_inventory() -> dict[str, object]:
     }
 
 
+def _sign_trust_bundle(value: dict[str, object]) -> dict[str, object]:
+    payload = {key: item for key, item in value.items() if key != "signature"}
+    message = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    payload["signature"] = base64.b64encode(TRUST_SIGNER.sign(message)).decode("ascii")
+    return payload
+
+
+def _fingerprint_for_key(public_key: str) -> str:
+    blob = base64.b64decode(public_key.split()[1], validate=True)
+    digest = base64.b64encode(hashlib.sha256(blob).digest()).decode("ascii").rstrip("=")
+    return f"SHA256:{digest}"
+
+
 def host_trust(
     environment: str,
     identity_ref: str,
     address: str,
     trust_type: str = "host_key",
 ) -> dict[str, object]:
-    return {
-        "schema_version": "anitrend.platform.ssh-host-trust.v1",
-        "environment": environment,
-        "identity_ref": identity_ref,
-        "trust_type": trust_type,
-        "host": {
-            "address": address,
-            "public_key": PUBLIC_KEY,
-            "fingerprint_sha256": FINGERPRINT,
-        },
-    }
+    return _sign_trust_bundle(
+        {
+            "schema_version": "anitrend.platform.ssh-host-trust.v1",
+            "environment": environment,
+            "identity_ref": identity_ref,
+            "trust_type": trust_type,
+            "host": {
+                "address": address,
+                "public_key": PUBLIC_KEY,
+                "fingerprint_sha256": FINGERPRINT,
+            },
+        }
+    )
 
 
 def host_vars(inventory: dict[str, object]) -> dict[str, object]:
-    metadata = inventory["_meta"]
-    assert isinstance(metadata, dict)
-    hostvars = metadata["hostvars"]
-    assert isinstance(hostvars, dict)
-    values = hostvars["platform-target"]
+    all_group = inventory["all"]
+    assert isinstance(all_group, dict)
+    children = all_group["children"]
+    assert isinstance(children, dict)
+    target_group = children["platform_target"]
+    assert isinstance(target_group, dict)
+    hosts = target_group["hosts"]
+    assert isinstance(hosts, dict)
+    values = hosts["platform-target"]
     assert isinstance(values, dict)
     return values
 
@@ -126,15 +154,31 @@ def test_lab_vm_inventory_generates_strict_known_hosts_and_redacted_ansible_inve
     known_hosts = tmp_path / "private trust" / "known_hosts"
     trust = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.18")
 
-    inventory = prepare_inventory(lab_vm_inventory(), trust, "lab", known_hosts)
+    inventory = prepare_inventory(lab_vm_inventory(), trust, "lab", known_hosts, TRUST_ROOT)
     variables = host_vars(inventory)
-    ssh_args = variables["ansible_ssh_common_args"]
-
     assert variables["ansible_host"] == "192.0.2.18"
     assert variables["ansible_user"] == "ansible"
+    assert variables["ansible_host_key_checking"] is True
+    assert variables["ansible_ssh_common_args"] == ""
+    assert variables["ansible_ssh_extra_args"] == ""
+
+    ssh_args = variables["ansible_ssh_args"]
     assert "StrictHostKeyChecking=yes" in ssh_args
-    assert "GlobalKnownHostsFile=/dev/null" in ssh_args
-    assert shlex.quote(str(known_hosts)) in ssh_args
+    ssh_tokens = shlex.split(ssh_args)
+    assert f'UserKnownHostsFile="{known_hosts}"' in ssh_tokens
+    ssh_executable = shutil.which("ssh")
+    assert ssh_executable is not None
+    effective_config = subprocess.run(
+        [ssh_executable, "-F", "/dev/null", "-G", *ssh_tokens, "192.0.2.18"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    known_hosts_setting = next(
+        line for line in effective_config.stdout.splitlines() if line.startswith("userknownhostsfile ")
+    )
+    assert known_hosts_setting == f"userknownhostsfile {known_hosts}"
+
     assert known_hosts.read_text(encoding="utf-8") == f"192.0.2.18 {PUBLIC_KEY}\n"
     assert stat.S_IMODE(known_hosts.stat().st_mode) == 0o600
     assert PUBLIC_KEY not in json.dumps(inventory)
@@ -149,7 +193,7 @@ def test_host_ca_trust_is_scoped_to_the_exact_inventory_address(tmp_path: Path):
     )
     known_hosts = tmp_path / "known_hosts"
 
-    prepare_inventory(lab_vm_inventory(), trust, "lab", known_hosts)
+    prepare_inventory(lab_vm_inventory(), trust, "lab", known_hosts, TRUST_ROOT)
 
     assert known_hosts.read_text(encoding="utf-8") == f"@cert-authority 192.0.2.18 {PUBLIC_KEY}\n"
 
@@ -162,7 +206,7 @@ def test_hcloud_inventory_uses_only_a_bound_public_address_and_preserves_policy(
     )
     known_hosts = tmp_path / "known_hosts"
 
-    inventory = prepare_inventory(hcloud_inventory(), trust, "rehearsal", known_hosts)
+    inventory = prepare_inventory(hcloud_inventory(), trust, "rehearsal", known_hosts, TRUST_ROOT)
     variables = host_vars(inventory)
 
     assert variables["ansible_host"] == "198.51.100.17"
@@ -176,11 +220,11 @@ def test_wrong_environment_or_host_identity_fails_before_writing_trust(tmp_path:
     trust = host_trust("lab", "host-identity:lab:wrong-host", "192.0.2.18")
 
     with pytest.raises(ValueError, match="environment"):
-        prepare_inventory(inventory, trust, "rehearsal", known_hosts)
+        prepare_inventory(inventory, trust, "rehearsal", known_hosts, TRUST_ROOT)
     assert not known_hosts.exists()
 
     with pytest.raises(ValueError, match="identity reference"):
-        prepare_inventory(inventory, trust, "lab", known_hosts)
+        prepare_inventory(inventory, trust, "lab", known_hosts, TRUST_ROOT)
     assert not known_hosts.exists()
 
 
@@ -188,9 +232,28 @@ def test_untrusted_address_or_fingerprint_is_rejected(tmp_path: Path):
     inventory = lab_vm_inventory()
     wrong_address = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.19")
     with pytest.raises(ValueError, match="address"):
-        prepare_inventory(inventory, wrong_address, "lab", tmp_path / "wrong-address")
+        prepare_inventory(inventory, wrong_address, "lab", tmp_path / "wrong-address", TRUST_ROOT)
 
     wrong_fingerprint = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.18")
     wrong_fingerprint["host"]["fingerprint_sha256"] = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    wrong_fingerprint = _sign_trust_bundle(wrong_fingerprint)
     with pytest.raises(ValueError, match="fingerprint"):
-        prepare_inventory(inventory, wrong_fingerprint, "lab", tmp_path / "wrong-fingerprint")
+        prepare_inventory(inventory, wrong_fingerprint, "lab", tmp_path / "wrong-fingerprint", TRUST_ROOT)
+
+def test_unsigned_host_trust_and_replaced_key_are_rejected(tmp_path: Path):
+    inventory = lab_vm_inventory()
+    trust = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.18")
+    unsigned = dict(trust)
+    del unsigned["signature"]
+    with pytest.raises(ValueError, match="schema validation"):
+        prepare_inventory(inventory, unsigned, "lab", tmp_path / "unsigned", TRUST_ROOT)
+
+    replaced_key = dict(trust)
+    replaced_host = dict(trust["host"])
+    key_blob = base64.b64decode(PUBLIC_KEY.split()[1], validate=True)
+    alternate_key = "ssh-ed25519 " + base64.b64encode(key_blob[:-1] + bytes([1])).decode("ascii")
+    replaced_host["public_key"] = alternate_key
+    replaced_host["fingerprint_sha256"] = _fingerprint_for_key(alternate_key)
+    replaced_key["host"] = replaced_host
+    with pytest.raises(ValueError, match="signature"):
+        prepare_inventory(inventory, replaced_key, "lab", tmp_path / "replaced", TRUST_ROOT)

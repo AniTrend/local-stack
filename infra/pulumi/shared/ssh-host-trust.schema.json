@@ -4,12 +4,16 @@
   "title": "AniTrend authenticated SSH host trust record",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "environment", "identity_ref", "trust_type", "host"],
+  "required": ["schema_version", "environment", "identity_ref", "trust_type", "host", "signature"],
   "properties": {
     "schema_version": { "const": "anitrend.platform.ssh-host-trust.v1" },
     "environment": { "enum": ["lab", "rehearsal", "production"] },
     "identity_ref": { "type": "string", "minLength": 1 },
     "trust_type": { "enum": ["host_key", "host_ca"] },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{86}==$"
+    },
     "host": { "$ref": "#/$defs/host" }
   },
   "$defs": {
