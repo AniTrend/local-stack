@@ -151,7 +151,7 @@ def host_vars(inventory: dict[str, object]) -> dict[str, object]:
 
 
 def test_lab_vm_inventory_generates_strict_known_hosts_and_redacted_ansible_inventory(tmp_path: Path):
-    known_hosts = tmp_path / "private trust" / "known_hosts"
+    known_hosts = tmp_path / "run-%h" / "private trust" / "known_hosts"
     trust = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.18")
 
     inventory = prepare_inventory(lab_vm_inventory(), trust, "lab", known_hosts, TRUST_ROOT)
@@ -163,13 +163,16 @@ def test_lab_vm_inventory_generates_strict_known_hosts_and_redacted_ansible_inve
     assert variables["ansible_ssh_extra_args"] == ""
 
     ssh_args = variables["ansible_ssh_args"]
-    assert "StrictHostKeyChecking=yes" in ssh_args
     ssh_tokens = shlex.split(ssh_args)
-    assert f'UserKnownHostsFile="{known_hosts}"' in ssh_tokens
+    assert "-F" in ssh_tokens
+    assert ssh_tokens[ssh_tokens.index("-F") + 1] == "/dev/null"
+    assert any('UserKnownHostsFile="' in token and "run-%%h" in token and "private trust" in token for token in ssh_tokens)
+    assert "StrictHostKeyChecking=yes" in ssh_tokens
+    assert "KnownHostsCommand=none" in ssh_tokens
     ssh_executable = shutil.which("ssh")
     assert ssh_executable is not None
     effective_config = subprocess.run(
-        [ssh_executable, "-F", "/dev/null", "-G", *ssh_tokens, "192.0.2.18"],
+        [ssh_executable, "-G", *ssh_tokens, "192.0.2.18"],
         check=True,
         capture_output=True,
         text=True,
@@ -183,6 +186,15 @@ def test_lab_vm_inventory_generates_strict_known_hosts_and_redacted_ansible_inve
     assert stat.S_IMODE(known_hosts.stat().st_mode) == 0o600
     assert PUBLIC_KEY not in json.dumps(inventory)
     assert variables["platform_volumes"][0]["linux_device"] == "/dev/disk/by-id/virtio-platform-test"
+
+
+def test_known_hosts_path_rejects_environment_expansion_tokens(tmp_path: Path):
+    known_hosts = tmp_path / "run-${HOME}" / "known_hosts"
+    trust = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.18")
+
+    with pytest.raises(ValueError, match="expansion"):
+        prepare_inventory(lab_vm_inventory(), trust, "lab", known_hosts, TRUST_ROOT)
+    assert not known_hosts.exists()
 
 def test_host_ca_trust_is_scoped_to_the_exact_inventory_address(tmp_path: Path):
     trust = host_trust(

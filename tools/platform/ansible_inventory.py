@@ -197,13 +197,19 @@ def prepare_inventory(
         raise InventoryError("SSH host trust fingerprint does not match its public key")
 
     known_hosts_text = str(known_hosts_path)
-    if any(character in known_hosts_text for character in ("\0", "\n", "\r")):
-        raise InventoryError("known_hosts path contains unsupported control characters")
-    ssh_config_path = known_hosts_text.replace("\\", "\\\\").replace('"', '\\"')
+    if any(character in known_hosts_text for character in ("\0", "\n", "\r", "$")):
+        raise InventoryError("known_hosts path contains unsupported environment expansion or control characters")
+    ssh_config_path = (
+        known_hosts_text.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("%", "%%")
+    )
     user_known_hosts_option = shlex.quote(f'UserKnownHostsFile="{ssh_config_path}"')
     ssh_args = " ".join(
         (
+            "-F /dev/null",
             "-o StrictHostKeyChecking=yes",
+            "-o KnownHostsCommand=none",
             f"-o {user_known_hosts_option}",
             "-o GlobalKnownHostsFile=/dev/null",
             "-o IdentitiesOnly=yes",
