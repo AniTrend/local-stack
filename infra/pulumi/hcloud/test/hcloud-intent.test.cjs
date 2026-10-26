@@ -123,3 +123,21 @@ test("rejects production destruction policy and rehearsal without a TTL", () => 
   rehearsalWithoutTtl.safety_policy.allow_destroy = true;
   assert.throws(() => parseIntent(rehearsalWithoutTtl), /schema|ttl/i);
 });
+
+test("rejects volume sizes outside Hetzner limits and aggregate capacity", () => {
+  const tooSmall = validIntent();
+  tooSmall.volumes[0].size_gb = 9;
+  assert.throws(() => parseIntent(tooSmall), /size_gb/i);
+
+  const tooLarge = validIntent();
+  tooLarge.volumes[0].size_gb = 10001;
+  assert.throws(() => parseIntent(tooLarge), /size_gb/i);
+
+  const overCapacity = validIntent();
+  const original = overCapacity.volumes[0];
+  overCapacity.volumes = [
+    { ...original, id_ref: "first", size_gb: 6000, mount_path: "/mnt/first" },
+    { ...original, id_ref: "second", size_gb: 5000, mount_path: "/mnt/second" },
+  ];
+  assert.throws(() => parseIntent(overCapacity), /total volume capacity/i);
+});

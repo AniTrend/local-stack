@@ -226,8 +226,8 @@ export function parseEnvironmentIntent(value: unknown, configuredProjectRef: str
       throw new Error(`volumes contains duplicate reference ${volume.id_ref}`);
     }
     volumeRefs.add(volume.id_ref);
-    if (!Number.isInteger(volume.size_gb) || volume.size_gb < 1) {
-      throw new Error(`volumes[${index}].size_gb must be a positive integer`);
+    if (!Number.isInteger(volume.size_gb) || volume.size_gb < 10 || volume.size_gb > 10000) {
+      throw new Error(`volumes[${index}].size_gb must be between 10 and 10000 GB`);
     }
     if (
       !path.posix.isAbsolute(volume.mount_path) ||
@@ -241,6 +241,10 @@ export function parseEnvironmentIntent(value: unknown, configuredProjectRef: str
       throw new Error(`volumes contains duplicate mount path ${volume.mount_path}`);
     }
     mountPaths.add(volume.mount_path);
+  }
+  const totalVolumeSizeGb = intent.volumes.reduce((total, volume) => total + volume.size_gb, 0);
+  if (totalVolumeSizeGb > 10000) {
+    throw new Error("total volume capacity cannot exceed 10000 GB per server");
   }
 
   for (const [index, reference] of intent.ssh_key_refs.entries()) {

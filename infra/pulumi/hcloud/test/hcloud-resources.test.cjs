@@ -8,12 +8,17 @@ const { validatePulumiInventory } = require("../.artifacts/build/hcloud/inventor
 const resources = [];
 const invocations = [];
 
+const resourceOptions = [];
+const hcloudLabelValue = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$/;
+
 pulumi.runtime.setMocks(
   {
     newResource(args) {
       resources.push(args);
       const state = { ...args.inputs };
       switch (args.type) {
+        case "pulumi:pulumi:Stack":
+          return { id: args.name, state };
         case "hcloud:index/network:Network":
           return { id: "11", state };
         case "hcloud:index/networkSubnet:NetworkSubnet":
@@ -74,6 +79,8 @@ const provider = new hcloud.Provider("test-provider", { token: "mock-provider-va
 
 test("provisions protected HCloud resources and exports schema-valid non-secret inventory", async () => {
   const intent = validIntent();
+  intent.project_ref = "anitrend/production";
+  const longDnsHostname = `${"a".repeat(40)}.${"b".repeat(40)}.example.invalid`;
   intent.private_routes = [
     {
       hostname: "postgres.internal.example.invalid",
@@ -106,7 +113,41 @@ test("provisions protected HCloud resources and exports schema-valid non-secret 
     },
   ];
 
-  const unvalidatedInventory = await createHcloudInventory(intent, provider).promise();
+  intent.dns_records.push(
+    {
+      hostname: "example.invalid",
+      record_type: "A",
+      target_ref: "server:public-ipv4",
+      ttl_seconds: 300,
+    },
+    {
+      hostname: longDnsHostname,
+      record_type: "A",
+      target_ref: "server:public-ipv4",
+      ttl_seconds: 300,
+    },
+    {
+      hostname: "alias.example.invalid",
+      record_type: "CNAME",
+      target_ref: "api.example.invalid.",
+      ttl_seconds: 300,
+    },
+  );
+
+  const stack = await pulumi.runtime.runInPulumiStack(async () => {
+    pulumi.runtime.registerStackTransformation(({ type, opts }) => {
+      if (type.startsWith("hcloud:index/")) {
+        resourceOptions.push({
+          type,
+          protect: opts.protect,
+          replaceOnChanges: opts.replaceOnChanges,
+        });
+      }
+      return undefined;
+    });
+    return { inventory: await createHcloudInventory(intent, provider).promise() };
+  });
+  const unvalidatedInventory = stack.inventory;
   const inventory = validatePulumiInventory(unvalidatedInventory);
   const resource = (type) => resources.find((item) => item.type === type);
   const firewall = resource("hcloud:index/firewall:Firewall");
@@ -129,12 +170,10 @@ test("provisions protected HCloud resources and exports schema-valid non-secret 
   assert.deepEqual(server.inputs.sshKeys, ["anitrend-ops"]);
   assert.deepEqual(server.inputs.firewallIds, [21]);
   assert.equal(server.inputs.deleteProtection, true);
-  assert.deepEqual(server.inputs.labels, {
-    "anitrend.platform.environment": "production",
-    "anitrend.platform.managed-by": "pulumi",
-    "anitrend.platform.project-ref": "anitrend-prod",
-    "anitrend.platform.resource": "server",
-  });
+  assert.equal(server.inputs.labels["anitrend.platform.environment"], "production");
+  assert.equal(server.inputs.labels["anitrend.platform.managed-by"], "pulumi");
+  assert.equal(server.inputs.labels["anitrend.platform.project-ref"], "anitrend-production");
+  assert.equal(server.inputs.labels["anitrend.platform.resource"], "server");
   assert.equal(server.inputs.rebuildProtection, true);
   assert.equal(server.inputs.userData, undefined);
   assert.equal(serverNetwork.inputs.serverId, 31);
@@ -143,8 +182,22 @@ test("provisions protected HCloud resources and exports schema-valid non-secret 
   assert.equal(volume.inputs.deleteProtection, true);
   assert.equal(volumeAttachment.inputs.serverId, 31);
   assert.equal(volumeAttachment.inputs.volumeId, 41);
-  assert.equal(rrsets.length, 3);
+  assert.equal(rrsets.length, 6);
   assert.ok(rrsets.some((item) => item.inputs.type === "A" && item.inputs.records[0].value === "203.0.113.17"));
+  assert.equal(
+    rrsets.find((item) => item.inputs.name === "www").inputs.records[0].value,
+    "api.example.invalid.",
+  );
+  assert.equal(
+    rrsets.find((item) => item.inputs.name === "alias").inputs.records[0].value,
+    "api.example.invalid.",
+  );
+  for (const item of resources.filter((resource) => resource.inputs.labels !== undefined)) {
+    for (const value of Object.values(item.inputs.labels)) {
+      assert.ok(value.length <= 63);
+      assert.match(value, hcloudLabelValue);
+    }
+  }
   assert.ok(rrsets.some((item) => item.inputs.type === "AAAA" && item.inputs.records[0].value === "2001:db8::17"));
   assert.ok(invocations.some((item) => item.token === "hcloud:index/getSshKey:getSshKey"));
   assert.ok(invocations.some((item) => item.token === "hcloud:index/getZone:getZone"));
@@ -163,6 +216,12 @@ test("provisions protected HCloud resources and exports schema-valid non-secret 
   assert.ok(inventory.resource_ids.some((item) => item.kind === "server_network"));
   assert.ok(!JSON.stringify(inventory).includes("mock-provider-value"));
   assert.ok(!JSON.stringify(inventory).includes("ssh-ed25519"));
+  const productionOptions = resourceOptions.filter((options) => options.type !== "pulumi:providers:hcloud");
+  assert.ok(productionOptions.length > 0);
+  assert.ok(productionOptions.every((options) => options.protect === true));
+  const serverOptions = productionOptions.find((options) => options.type === "hcloud:index/server:Server");
+  assert.ok(serverOptions);
+  assert.deepEqual(serverOptions.replaceOnChanges, ["serverType", "image"]);
 });
 
 test("production resources are protected while rehearsal deletion remains available", () => {

@@ -14,13 +14,34 @@ export function protectedOptions(intent: EnvironmentIntent, provider: pulumi.Pro
   return { provider, protect };
 }
 
+const hcloudLabelKey = /^([A-Za-z0-9](?:[A-Za-z0-9._-]{0,253}[A-Za-z0-9])?\/)?[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$/;
+const hcloudLabelValue = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$/;
+
+function labelValue(value: string): string {
+  const safe = value
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, "")
+    .slice(0, 63)
+    .replace(/[^A-Za-z0-9]+$/g, "");
+  if (!hcloudLabelValue.test(safe)) {
+    throw new Error("generated HCloud label value is invalid");
+  }
+  return safe;
+}
+
 function resourceLabels(intent: EnvironmentIntent, resource: string): Record<string, string> {
-  return {
+  const labels = {
     "anitrend.platform.environment": intent.environment,
     "anitrend.platform.managed-by": "pulumi",
-    "anitrend.platform.project-ref": intent.project_ref,
-    "anitrend.platform.resource": resource,
+    "anitrend.platform.project-ref": labelValue(intent.project_ref),
+    "anitrend.platform.resource": labelValue(resource),
   };
+  for (const [key, value] of Object.entries(labels)) {
+    if (!hcloudLabelKey.test(key) || !hcloudLabelValue.test(value)) {
+      throw new Error(`generated HCloud label ${key} is invalid`);
+    }
+  }
+  return labels;
 }
 
 
@@ -173,6 +194,9 @@ function dnsTarget(record: DnsRecordGroup, target: string, server: hcloud.Server
   if (target === "server:public-ipv6" && record.type === "AAAA") {
     return server.ipv6Address;
   }
+  if (record.type === "CNAME") {
+    return target.endsWith(".") ? target : `${target}.`;
+  }
   return target;
 }
 
@@ -228,17 +252,34 @@ export function createHcloudInventory(
         throw new Error("HCloud DNS records require a validated existing zone");
       }
 
-      const labels = resourceLabels(intent, "platform");
+      const networkLabelEntries = intent.network_cidrs.map((networkIntent) => ({
+        intent: networkIntent,
+        labels: resourceLabels(intent, `network-${networkIntent.name}`),
+      }));
+      const firewallLabels = resourceLabels(intent, "firewall");
+      const serverLabels = resourceLabels(intent, "server");
+      const volumeLabelEntries = intent.volumes.map((volumeIntent) => ({
+        intent: volumeIntent,
+        labels: resourceLabels(intent, `volume-${volumeIntent.id_ref}`),
+      }));
+      const dnsLabelEntries = preflight.dnsGroups.map((group) => ({
+        group,
+        labels: resourceLabels(intent, `dns-${group.name}-${group.type.toLowerCase()}`),
+      }));
       const serverName = `anitrend-${intent.environment}-host`;
       const resourceOpts = protectedOptions(intent, provider);
-      const networkResources = intent.network_cidrs.map((networkIntent) => {
+      const serverResourceOpts: pulumi.CustomResourceOptions = {
+        ...resourceOpts,
+        replaceOnChanges: ["serverType", "image"],
+      };
+      const networkResources = networkLabelEntries.map(({ intent: networkIntent, labels }) => {
         const network = new hcloud.Network(
           `network-${networkIntent.name}`,
           {
             name: `anitrend-${intent.environment}-${networkIntent.name}`,
             ipRange: networkIntent.cidr,
             deleteProtection: intent.environment === "production",
-            labels: { ...labels, "anitrend.platform.resource": `network-${networkIntent.name}` },
+            labels,
           },
           resourceOpts,
         );
@@ -259,7 +300,7 @@ export function createHcloudInventory(
         {
           name: `anitrend-${intent.environment}-firewall`,
           rules: firewallRules(intent),
-          labels: { ...labels, "anitrend.platform.resource": "firewall" },
+          labels: firewallLabels,
         },
         resourceOpts,
       );
@@ -276,9 +317,9 @@ export function createHcloudInventory(
           networks: [],
           deleteProtection: intent.environment === "production",
           rebuildProtection: intent.environment === "production",
-          labels: { ...labels, "anitrend.platform.resource": "server" },
+          labels: serverLabels,
         },
-        resourceOpts,
+        serverResourceOpts,
       );
       const serverNetworks = networkResources.map(({ intent: networkIntent, subnet }) => ({
         intent: networkIntent,
@@ -292,7 +333,7 @@ export function createHcloudInventory(
           resourceOpts,
         ),
       }));
-      const volumeResources = intent.volumes.map((volumeIntent) => {
+      const volumeResources = volumeLabelEntries.map(({ intent: volumeIntent, labels }) => {
         const volume = new hcloud.Volume(
           `volume-${volumeIntent.id_ref}`,
           {
@@ -301,7 +342,7 @@ export function createHcloudInventory(
             size: volumeIntent.size_gb,
             format: "ext4",
             deleteProtection: intent.environment === "production" || volumeIntent.protected,
-            labels: { ...labels, "anitrend.platform.resource": `volume-${volumeIntent.id_ref}` },
+            labels,
           },
           protectedOptions(intent, provider, intent.safety_policy.protect_resources || volumeIntent.protected),
         );
@@ -319,7 +360,7 @@ export function createHcloudInventory(
       const dnsResources =
         dnsZoneId === undefined
           ? []
-          : preflight.dnsGroups.map((group) => ({
+          : dnsLabelEntries.map(({ group, labels }) => ({
               group,
               resource: new hcloud.ZoneRrset(
                 `dns-${group.name}-${group.type.toLowerCase()}`,
@@ -330,7 +371,7 @@ export function createHcloudInventory(
                   ttl: group.ttl,
                   records: group.targets.map((target) => ({ value: dnsTarget(group, target, server) })),
                   changeProtection: intent.environment === "production",
-                  labels: { ...labels, "anitrend.platform.resource": `dns-${group.name}-${group.type.toLowerCase()}` },
+                  labels,
                 },
                 resourceOpts,
               ),

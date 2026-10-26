@@ -122,3 +122,17 @@ def test_environment_intent_schema_rejects_wrong_provider_and_unsafe_reference_f
     volume["size_gb"] = 1.5
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(fractional_volume_size, schema)
+
+
+def test_volume_sizes_obey_hetzner_per_volume_limits():
+    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    for size_gb in (10, 10000):
+        intent = valid_intent()
+        intent["volumes"][0]["size_gb"] = size_gb
+        jsonschema.validate(intent, schema)
+
+    for size_gb in (9, 10001):
+        intent = valid_intent()
+        intent["volumes"][0]["size_gb"] = size_gb
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(intent, schema)
