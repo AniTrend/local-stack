@@ -2,8 +2,11 @@
 driver:
   name: docker
 platforms:
-  - name: ubuntu-2404
+  - name: "${PLATFORM_MOLECULE_INSTANCE_NAME}"
     image: anitrend/platform-ansible:ubuntu-24.04
+    labels:
+      platform-owner: anitrend-platform-ansible-test
+      platform-run-id: "${PLATFORM_MOLECULE_RUN_ID}"
     pre_build_image: true
     pull: false
     command: sleep infinity

@@ -89,6 +89,14 @@
     group: root
     mode: "0600"
 
+- name: Set distinctive metadata on the populated filesystem root
+  ansible.builtin.file:
+    path: "{{ platform_storage_existing_mount }}"
+    state: directory
+    owner: nobody
+    group: nogroup
+    mode: "0711"
+
 - name: Unmount the populated image before stable-device discovery
   ansible.posix.mount:
     path: "{{ platform_storage_existing_mount }}"
@@ -107,6 +115,68 @@
     dest: "{{ platform_storage_empty_link }}"
     state: link
     force: false
+
+- name: Refuse another device without changing the mounted filesystem
+  block:
+    - name: Temporarily mount the populated filesystem for the mismatch test
+      ansible.posix.mount:
+        src: "{{ platform_storage_existing_loop.stdout }}"
+        path: "{{ platform_storage_existing_mount }}"
+        fstype: ext4
+        opts: defaults
+        state: ephemeral
+
+    - name: Attempt to use the empty device at the populated mount path
+      ansible.builtin.include_role:
+        name: platform_host_storage
+      vars:
+        platform_volumes:
+          - resource_id: loop-wrong-device
+            reference: loop-wrong-device
+            linux_device: "{{ platform_storage_empty_link }}"
+            filesystem: ext4
+            format_policy: never
+            mount_path: "{{ platform_storage_existing_mount }}"
+            size_gb: 1
+            data_classification: disposable-test-data
+            protected: false
+        platform_storage_allow_create_only_format: false
+
+    - name: Fail if storage accepts the different mounted device
+      ansible.builtin.fail:
+        msg: "The storage role unexpectedly accepted another device at the populated mount path."
+  rescue:
+    - name: Require rejection at the existing-mount identity check
+      ansible.builtin.assert:
+        that:
+          - "'Refuse to replace another device at the intended mount path' in ansible_failed_task.name"
+
+    - name: Inspect populated filesystem metadata after rejection
+      ansible.builtin.stat:
+        path: "{{ platform_storage_existing_mount }}"
+      register: platform_storage_metadata_after_rejection
+
+    - name: Require the rejected device to leave metadata untouched
+      ansible.builtin.assert:
+        that:
+          - platform_storage_metadata_after_rejection.stat.mode == "0711"
+          - platform_storage_metadata_after_rejection.stat.pw_name == "nobody"
+          - platform_storage_metadata_after_rejection.stat.gr_name == "nogroup"
+
+    - name: Read the populated filesystem marker after rejection
+      ansible.builtin.slurp:
+        src: "{{ platform_storage_existing_mount }}/preserved.txt"
+      register: platform_storage_marker_after_rejection
+
+    - name: Require populated data to remain unchanged after rejection
+      ansible.builtin.assert:
+        that:
+          - (platform_storage_marker_after_rejection.content | b64decode | trim) == "existing-data-preserved"
+  always:
+    - name: Unmount the populated filesystem after the mismatch test
+      ansible.posix.mount:
+        path: "{{ platform_storage_existing_mount }}"
+        state: unmounted
 
 - name: Converge the populated device without formatting it
   ansible.builtin.include_role:
@@ -133,6 +203,46 @@
   ansible.builtin.assert:
     that:
       - (platform_storage_preserved_data.content | b64decode | trim) == "existing-data-preserved"
+
+- name: Inspect filesystem-root metadata after storage convergence
+  ansible.builtin.stat:
+    path: "{{ platform_storage_existing_mount }}"
+  register: platform_storage_metadata_after_convergence
+
+- name: Require storage convergence to preserve filesystem-root metadata
+  ansible.builtin.assert:
+    that:
+      - platform_storage_metadata_after_convergence.stat.mode == "0711"
+      - platform_storage_metadata_after_convergence.stat.pw_name == "nobody"
+      - platform_storage_metadata_after_convergence.stat.gr_name == "nogroup"
+
+- name: Converge the populated device again without changing its root metadata
+  ansible.builtin.include_role:
+    name: platform_host_storage
+  vars:
+    platform_volumes:
+      - resource_id: loop-populated
+        reference: loop-populated
+        linux_device: "{{ platform_storage_existing_link }}"
+        filesystem: ext4
+        format_policy: never
+        mount_path: "{{ platform_storage_existing_mount }}"
+        size_gb: 1
+        data_classification: disposable-test-data
+        protected: false
+    platform_storage_allow_create_only_format: false
+
+- name: Inspect filesystem-root metadata after repeat convergence
+  ansible.builtin.stat:
+    path: "{{ platform_storage_existing_mount }}"
+  register: platform_storage_metadata_after_repeat
+
+- name: Require repeat convergence to preserve filesystem-root metadata
+  ansible.builtin.assert:
+    that:
+      - platform_storage_metadata_after_repeat.stat.mode == "0711"
+      - platform_storage_metadata_after_repeat.stat.pw_name == "nobody"
+      - platform_storage_metadata_after_repeat.stat.gr_name == "nogroup"
 
 - name: Remove the populated test mount entry before the next scenario
   ansible.posix.mount:

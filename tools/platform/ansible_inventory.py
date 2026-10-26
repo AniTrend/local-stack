@@ -86,12 +86,13 @@ def _validate_firewall_policy(policy: dict[str, object]) -> None:
 
     for route_type in ("public_routes", "private_routes"):
         for route in policy[route_type]:
-            if route_type == "public_routes" and (
-                route["protocol"] not in {"http", "https"}
-                or (route["protocol"] == "http" and route["port"] != 80)
-                or (route["protocol"] == "https" and route["port"] != 443)
-            ):
-                raise InventoryError("public firewall routes are limited to HTTP 80 and HTTPS 443")
+            protocol = route["protocol"]
+            port = route["port"]
+            is_http_alias = protocol == "http" and port == 80
+            is_https_alias = protocol == "https" and port == 443
+            is_web_tcp = protocol == "tcp" and port in {80, 443}
+            if route_type == "public_routes" and not (is_http_alias or is_https_alias or is_web_tcp):
+                raise InventoryError("public firewall routes are limited to TCP ports 80/443")
             for cidr in route["source_cidrs"]:
                 network = _canonical_network(cidr, "firewall route source CIDR")
                 if route_type == "private_routes" and network.prefixlen == 0:
@@ -192,10 +193,13 @@ def prepare_inventory(
     volume_values = inventory_value["volumes"]
     if not isinstance(volume_values, list) or any(not isinstance(volume, dict) for volume in volume_values):
         raise InventoryError("platform inventory contains invalid storage volumes")
-    mount_paths = sorted(volume["mount_path"] for volume in volume_values)
-    for parent, child in zip(mount_paths, mount_paths[1:]):
-        if child == parent or child.startswith(parent + "/"):
-            raise InventoryError("platform inventory contains duplicate or overlapping storage mount paths")
+    mount_paths = [volume["mount_path"] for volume in volume_values]
+    if len(set(mount_paths)) != len(mount_paths):
+        raise InventoryError("platform inventory contains duplicate or overlapping storage mount paths")
+    for parent in mount_paths:
+        for child in mount_paths:
+            if child.startswith(parent + "/"):
+                raise InventoryError("platform inventory contains duplicate or overlapping storage mount paths")
     if trust_value.get("schema_version") != SSH_HOST_TRUST_VERSION:
         raise InventoryError("unsupported SSH host trust schema version")
     _validate_document(trust_value, "SSH host trust", SSH_HOST_TRUST_SCHEMA)

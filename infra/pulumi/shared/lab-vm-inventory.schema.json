@@ -89,7 +89,7 @@
       "properties": {
         "resource_id": { "type": "string", "minLength": 1 },
         "reference": { "type": "string", "minLength": 1 },
-        "linux_device": { "type": "string", "pattern": "^/dev/disk/by-id/[^\\s]+$" },
+        "linux_device": { "type": "string", "pattern": "^/dev/disk/by-id/(?!\\.{1,2}$)[^/\\s]+$" },
         "filesystem": { "const": "ext4" },
         "format_policy": { "enum": ["never", "create-only"] },
         "mount_path": { "type": "string", "pattern": "^/(?:srv|mnt|var/lib)/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$" },

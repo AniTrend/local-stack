@@ -1,0 +1,55 @@
+---
+- name: Verify storage rejects path traversal before device access
+  hosts: platform_target
+  gather_facts: false
+  vars:
+    platform_storage_identity_test_run_id: "{{ lookup('env', 'PLATFORM_RUN_ID') }}"
+    platform_storage_invalid_device: >-
+      /dev/disk/by-id/../../anitrend-invalid-{{ platform_storage_identity_test_run_id }}
+    platform_storage_invalid_target: "/dev/anitrend-invalid-{{ platform_storage_identity_test_run_id }}"
+    platform_storage_invalid_mount: "/srv/anitrend/storage-invalid-{{ platform_storage_identity_test_run_id }}"
+    platform_storage_allow_create_only_format: false
+  tasks:
+    - name: Require a unique test identifier before checking the device path
+      ansible.builtin.assert:
+        that:
+          - platform_storage_identity_test_run_id is match('^[a-z0-9][a-z0-9-]{0,31}$')
+        fail_msg: "A unique run identifier is required for the storage identity check."
+
+    - name: Ensure the normalized traversal target is absent
+      ansible.builtin.stat:
+        path: "{{ platform_storage_invalid_target }}"
+      register: platform_storage_invalid_target_stat
+
+    - name: Require the storage identity test target to be absent
+      ansible.builtin.assert:
+        that:
+          - not platform_storage_invalid_target_stat.stat.exists
+        fail_msg: "The storage identity test target unexpectedly exists."
+
+    - name: Require the storage role to reject a path-traversing device identifier
+      block:
+        - name: Attempt storage convergence with a traversal identifier
+          ansible.builtin.include_role:
+            name: platform_host_storage
+          vars:
+            platform_volumes:
+              - resource_id: invalid-device-identity
+                reference: invalid-device-identity
+                linux_device: "{{ platform_storage_invalid_device }}"
+                filesystem: ext4
+                format_policy: never
+                mount_path: "{{ platform_storage_invalid_mount }}"
+                size_gb: 1
+                data_classification: test-only
+                protected: false
+
+        - name: Fail if storage accepts the traversal identifier
+          ansible.builtin.fail:
+            msg: "The storage role accepted a path-traversing stable-device identifier."
+      rescue:
+        - name: Require rejection at the identity validation task
+          ansible.builtin.assert:
+            that:
+              - "'Validate declared volume identity and policy' in ansible_failed_task.name"
+            fail_msg: "The path traversal was rejected only after device inspection or mutation."

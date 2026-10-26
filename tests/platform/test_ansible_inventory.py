@@ -404,3 +404,77 @@ def test_lab_vm_rejects_overlapping_mount_paths(tmp_path: Path):
 
     with pytest.raises(ValueError, match="overlapping storage mount paths"):
         prepare_inventory(inventory, trust, "lab", tmp_path / "known_hosts", TRUST_ROOT)
+
+
+def test_hcloud_inventory_accepts_tcp_public_web_routes(tmp_path: Path):
+    inventory = hcloud_inventory()
+    routes = [
+        {
+            "hostname": "website.example.test",
+            "service_ref": "website",
+            "port": 80,
+            "protocol": "tcp",
+            "source_cidrs": ["0.0.0.0/0"],
+        },
+        {
+            "hostname": "secure.example.test",
+            "service_ref": "website-secure",
+            "port": 443,
+            "protocol": "tcp",
+            "source_cidrs": ["0.0.0.0/0"],
+        },
+    ]
+    inventory["firewall_policy"]["public_routes"] = routes
+    trust = host_trust(
+        "rehearsal",
+        "host-identity:rehearsal:server-101",
+        "198.51.100.17",
+    )
+
+    prepared = prepare_inventory(
+        inventory,
+        trust,
+        "rehearsal",
+        tmp_path / "known_hosts",
+        TRUST_ROOT,
+    )
+
+    assert host_vars(prepared)["platform_firewall_policy"]["public_routes"] == routes
+
+
+def test_lab_vm_rejects_non_adjacent_overlapping_mount_paths(tmp_path: Path):
+    inventory = lab_vm_inventory()
+    first_volume = inventory["volumes"][0]
+    first_volume["mount_path"] = "/srv/data"
+    second_volume = dict(first_volume)
+    second_volume["resource_id"] = "test-volume-02"
+    second_volume["reference"] = "lab-storage-test-02"
+    second_volume["linux_device"] = "/dev/disk/by-id/virtio-platform-test-02"
+    second_volume["mount_path"] = "/srv/data-extra"
+    third_volume = dict(first_volume)
+    third_volume["resource_id"] = "test-volume-03"
+    third_volume["reference"] = "lab-storage-test-03"
+    third_volume["linux_device"] = "/dev/disk/by-id/virtio-platform-test-03"
+    third_volume["mount_path"] = "/srv/data/nested"
+    inventory["volumes"].extend([second_volume, third_volume])
+    trust = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.18")
+
+    with pytest.raises(ValueError, match="overlapping storage mount paths"):
+        prepare_inventory(inventory, trust, "lab", tmp_path / "known_hosts", TRUST_ROOT)
+
+
+@pytest.mark.parametrize(
+    "linux_device",
+    [
+        "/dev/disk/by-id/../../sdb",
+        "/dev/disk/by-id/.",
+        "/dev/disk/by-id/..",
+    ],
+)
+def test_lab_vm_rejects_device_identifier_path_traversal(tmp_path: Path, linux_device: str):
+    inventory = lab_vm_inventory()
+    inventory["volumes"][0]["linux_device"] = linux_device
+    trust = host_trust("lab", "host-identity:lab:platform-test-01", "192.0.2.18")
+
+    with pytest.raises(ValueError, match="schema validation"):
+        prepare_inventory(inventory, trust, "lab", tmp_path / "known_hosts", TRUST_ROOT)

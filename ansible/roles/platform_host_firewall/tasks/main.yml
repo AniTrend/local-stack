@@ -49,6 +49,11 @@
       - platform_firewall_ssh_peer_allowed.rc == 0
     fail_msg: "The active SSH peer is not covered by the declared SSH source CIDRs."
 
+- name: Refresh network facts after Tailscale enrollment
+  ansible.builtin.setup:
+    gather_subset:
+      - network
+
 - name: Determine the host default-route interfaces
   ansible.builtin.set_fact:
     platform_firewall_ipv4_interface: "{{ ansible_facts.get('default_ipv4', {}).get('interface', '') }}"

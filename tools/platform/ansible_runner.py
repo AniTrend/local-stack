@@ -23,6 +23,9 @@ from typing import Mapping, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ARTIFACT_ROOT = REPO_ROOT / ".artifacts" / "platform"
 MOLECULE_IMAGE = "anitrend/platform-ansible:ubuntu-24.04"
+MOLECULE_OWNER_LABEL = "platform-owner"
+MOLECULE_OWNER_VALUE = "anitrend-platform-ansible-test"
+MOLECULE_RUN_LABEL = "platform-run-id"
 FORMAT_CONFIRMATION = "I_UNDERSTAND_THIS_FORMATS_ONLY_DECLARED_EMPTY_VOLUMES"
 RESERVED_CONTEXT = re.compile(
     r"(^|[-_.])(prod(?:uction)?|legacy|rehearsal|hcloud|hetzner|remote)(?:$|[-_.])",
@@ -179,12 +182,23 @@ def _tool_path(environ: Mapping[str, str], name: str, default: str) -> str:
         return str(rooted_path.resolve())
     return value
 
+def _project_collections_path(environ: Mapping[str, str]) -> Path:
+    configured = Path(environ.get("PLATFORM_ANSIBLE_COLLECTIONS_PATH", ".tools/platform/collections")).expanduser()
+    if not configured.is_absolute():
+        configured = REPO_ROOT / configured
+    resolved = configured.resolve()
+    try:
+        resolved.relative_to(REPO_ROOT.resolve())
+    except ValueError as error:
+        raise RunnerBlocked("Ansible collections must be installed inside the repository") from error
+    return resolved
+
 
 def _ansible_environment(environ: Mapping[str, str]) -> dict[str, str]:
     result = dict(environ)
     result["ANSIBLE_CONFIG"] = str(REPO_ROOT / "ansible" / "ansible.cfg")
     result["ANSIBLE_ROLES_PATH"] = str(REPO_ROOT / "ansible" / "roles")
-    result["ANSIBLE_COLLECTIONS_PATH"] = str(REPO_ROOT / ".tools" / "platform" / "collections")
+    result["ANSIBLE_COLLECTIONS_PATH"] = str(_project_collections_path(environ))
     result["ANSIBLE_HOST_KEY_CHECKING"] = "True"
     tool_directories = [str(Path(sys.executable).resolve().parent)]
     for name, default in (
@@ -264,14 +278,8 @@ def _validate_ansible_toolchain(environ: Mapping[str, str], lab) -> dict[str, ob
     if mismatched:
         raise RunnerBlocked("pinned Ansible tool versions are missing or mismatched: " + ", ".join(sorted(mismatched)))
 
-    collections_path = Path(environ.get("PLATFORM_ANSIBLE_COLLECTIONS_PATH", ".tools/platform/collections"))
-    if not collections_path.is_absolute():
-        collections_path = REPO_ROOT / collections_path
-    collections_path = collections_path.resolve()
-    try:
-        collections_path.relative_to(REPO_ROOT.resolve())
-    except ValueError as error:
-        raise RunnerBlocked("Ansible collections must be installed inside the repository") from error
+    collections_path = _project_collections_path(environ)
+
     required_collections = lab._locked_ansible_collections(REPO_ROOT / "ansible" / "requirements.yml")
     installed_collections = _project_collection_versions(collections_path, sorted(required_collections))
     mismatched_collections = [
@@ -319,6 +327,7 @@ def _syntax_check_playbooks(environ: Mapping[str, str]) -> None:
         "upgrade.yml",
         "reconnect-verify.yml",
         "vm-verify.yml",
+        "storage-identity-safety-verify.yml",
         "storage-safety-verify.yml",
     )
     for playbook in playbooks:
@@ -360,6 +369,18 @@ def run_container_test(environment: str, environ: Mapping[str, str]) -> None:
     for name in ("DOCKER_CONTEXT", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "DOCKER_API_VERSION", "DOCKER_CONFIG"):
         child_environment.pop(name, None)
     _validate_ansible_toolchain(child_environment, lab)
+
+    molecule_run_id = _new_run_id()
+    molecule_instance_name = _molecule_instance_name(molecule_run_id)
+    child_environment["PLATFORM_MOLECULE_RUN_ID"] = molecule_run_id
+    child_environment["PLATFORM_MOLECULE_INSTANCE_NAME"] = molecule_instance_name
+    _preflight_molecule_container(
+        lab,
+        context,
+        molecule_instance_name,
+        molecule_run_id,
+        child_environment,
+    )
 
     _syntax_check_playbooks(child_environment)
 
@@ -437,9 +458,66 @@ def _write_manifest(path: Path, value: dict[str, object]) -> None:
 def _new_run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dt%H%M%sz").lower() + "-" + uuid.uuid4().hex[:8]
 
+def _automation_connection_arguments(
+    private_key: Path,
+    extra_vars: Mapping[str, object] | None = None,
+) -> list[str]:
+    variables = dict(extra_vars or {})
+    variables["ansible_user"] = "platform-automation"
+    return [
+        "--private-key",
+        str(private_key),
+        "--user",
+        "platform-automation",
+        "--extra-vars",
+        json.dumps(variables, sort_keys=True, separators=(",", ":")),
+    ]
+
+
+def _molecule_instance_name(run_id: str) -> str:
+    return f"platform-ansible-{run_id}-ubuntu-2404"
+
+
+def _require_molecule_container_ownership(labels: object, run_id: str) -> None:
+    if (
+        not isinstance(labels, dict)
+        or labels.get(MOLECULE_OWNER_LABEL) != MOLECULE_OWNER_VALUE
+        or labels.get(MOLECULE_RUN_LABEL) != run_id
+    ):
+        raise RunnerBlocked("refusing to let Molecule destroy a container with mismatched ownership/run labels")
+
+
+def _preflight_molecule_container(
+    lab,
+    context: str,
+    instance_name: str,
+    run_id: str,
+    environ: Mapping[str, str],
+) -> None:
+    inspect_command = lab._docker_command(
+        context,
+        "container",
+        "inspect",
+        "--format",
+        "{{json .Config.Labels}}",
+        instance_name,
+    )
+    result = _run_capture(inspect_command, cwd=REPO_ROOT, environ=environ)
+    if result.returncode != 0:
+        if "No such object" in result.stderr or "No such container" in result.stderr:
+            return
+        raise RunnerBlocked("could not inspect the Molecule fixture before its destroy phase")
+    try:
+        labels = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RunnerBlocked("Molecule fixture ownership labels could not be parsed") from error
+    _require_molecule_container_ownership(labels, run_id)
+
 
 def _safe_command_display(name: str, playbook: str, connection: str) -> str:
     return f"ansible-playbook --inventory <generated> --private-key <{connection}> {playbook}"
+
+
 
 
 def run_host_verify(environment: str, tier: str, environ: Mapping[str, str]) -> Path:
@@ -590,7 +668,11 @@ def run_host_verify(environment: str, tier: str, environ: Mapping[str, str]) -> 
 
         ansible_playbook = _tool_path(child_environment, "PLATFORM_ANSIBLE_BIN", "ansible-playbook")
         inventory_argument = str(generated_inventory_path)
-        automation_connection = ["--private-key", str(inputs.automation_private_key), "--user", "platform-automation"]
+        automation_connection = _automation_connection_arguments(inputs.automation_private_key)
+        automation_recovery_connection = _automation_connection_arguments(
+            inputs.automation_private_key,
+            {"platform_firewall_recovery_access_verified": True},
+        )
         bootstrap_connection = ["--private-key", str(inputs.bootstrap_private_key)]
 
         run_step(
@@ -606,14 +688,24 @@ def run_host_verify(environment: str, tier: str, environ: Mapping[str, str]) -> 
             connection="PLATFORM_VM_AUTOMATION_PRIVATE_KEY",
         )
         run_step(
-            "fresh_host_convergence",
+            "storage_device_identity_safety_checks",
             [
                 ansible_playbook,
                 "-i",
                 inventory_argument,
                 *automation_connection,
-                "--extra-vars",
-                "platform_firewall_recovery_access_verified=true",
+                str(REPO_ROOT / "ansible" / "storage-identity-safety-verify.yml"),
+            ],
+            playbook="storage-identity-safety-verify.yml",
+            connection="PLATFORM_VM_AUTOMATION_PRIVATE_KEY",
+        )
+        run_step(
+            "fresh_host_convergence",
+            [
+                ansible_playbook,
+                "-i",
+                inventory_argument,
+                *automation_recovery_connection,
                 str(REPO_ROOT / "ansible" / "fresh-host.yml"),
             ],
             playbook="fresh-host.yml",
@@ -643,9 +735,7 @@ def run_host_verify(environment: str, tier: str, environ: Mapping[str, str]) -> 
                 ansible_playbook,
                 "-i",
                 inventory_argument,
-                *automation_connection,
-                "--extra-vars",
-                "platform_firewall_recovery_access_verified=true",
+                *automation_recovery_connection,
                 str(REPO_ROOT / "ansible" / "fresh-host.yml"),
             ],
             playbook="fresh-host.yml",

@@ -3,6 +3,8 @@
   ansible.builtin.assert:
     that:
       - platform_volume.linux_device is match('^/dev/disk/by-id/[^\\s]+$')
+      - platform_volume.linux_device.split('/') | length == 5
+      - platform_volume.linux_device.split('/')[-1] not in [".", ".."]
       - platform_volume.filesystem == "ext4"
       - platform_volume.format_policy in ["never", "create-only"]
       - platform_volume.mount_path is match('^/(srv|mnt|var/lib)/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$')
@@ -58,13 +60,6 @@
   register: platform_volume_major_minor
   changed_when: false
 
-- name: Create the declared mount directory
-  ansible.builtin.file:
-    path: "{{ platform_volume.mount_path }}"
-    state: directory
-    owner: root
-    group: root
-    mode: "0750"
 
 - name: Inspect an existing mount at the intended path
   ansible.builtin.command:
@@ -105,6 +100,14 @@
       - platform_existing_volume_mounts.stdout_lines | difference([platform_volume.mount_path]) | length == 0
     fail_msg: "Refusing a volume already mounted outside its declared path."
   when: platform_existing_volume_mounts.rc == 0
+- name: Create the declared mount directory
+  ansible.builtin.file:
+    path: "{{ platform_volume.mount_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  when: platform_existing_mount.rc == 1
 
 - name: Detect an existing filesystem signature
   ansible.builtin.command:

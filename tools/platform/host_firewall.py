@@ -157,21 +157,17 @@ def build_input_rules(policy: FirewallPolicy, family: str) -> list[list[str]]:
 def build_docker_rules(policy: FirewallPolicy, family: str) -> list[list[str]]:
     if family not in {"ipv4", "ipv6"}:
         raise ValueError("family must be ipv4 or ipv6")
-    interface = policy.ipv4_interface if family == "ipv4" else policy.ipv6_interface
-    if not interface:
-        raise ValueError(f"the {family} Docker firewall requires an external interface")
     rules = [
         ["-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "RETURN"],
         ["-i", "docker0", "-j", "RETURN"],
-        ["-i", "br+", "-j", "RETURN"],
+        ["-i", "br-+", "-j", "RETURN"],
+        ["-i", "docker_gwbridge", "-j", "RETURN"],
     ]
     for route in _routes_for(policy):
         for cidr in route.source_cidrs:
             if _matches_family(cidr, family):
                 rules.append(
                     [
-                        "-i",
-                        interface,
                         "-p",
                         _protocol(route.protocol),
                         "-m",
@@ -186,7 +182,7 @@ def build_docker_rules(policy: FirewallPolicy, family: str) -> list[list[str]]:
                         "RETURN",
                     ]
                 )
-    rules.extend([["-i", interface, "-j", "DROP"], ["-j", "RETURN"]])
+    rules.append(["-j", "DROP"])
     return rules
 
 
@@ -219,6 +215,15 @@ def _policy_matches(binary: str, parent: str, active: str, rules: list[list[str]
 
     actual_rules = [line for line in chain_lines if line.startswith(f"-A {active} ")]
     if len(actual_rules) != len(rules):
+        return False
+
+    expected_drop_positions = [
+        index for index, rule in enumerate(rules) if rule[-2:] == ["-j", "DROP"]
+    ]
+    actual_drop_positions = [
+        index for index, line in enumerate(actual_rules) if line.endswith(" -j DROP")
+    ]
+    if actual_drop_positions != expected_drop_positions:
         return False
 
     for rule in rules:
@@ -306,13 +311,9 @@ def apply_policy(policy: FirewallPolicy, action: str) -> bool:
         if policy.ipv6_enabled:
             families.append("ipv6")
     else:
-        families = []
-        if policy.ipv4_interface:
-            families.append("ipv4")
-        if policy.ipv6_enabled and policy.ipv6_interface:
+        families = ["ipv4"]
+        if policy.ipv6_enabled:
             families.append("ipv6")
-        if not families:
-            raise FirewallError("Docker firewall requires at least one external interface")
 
     for family in families:
         binary = "iptables" if family == "ipv4" else "ip6tables"
