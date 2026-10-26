@@ -1,0 +1,109 @@
+---
+- name: Verify the platform host baseline
+  hosts: all
+  become: "{{ ansible_user | default('root') != 'root' }}"
+  vars:
+    platform_automation_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  tasks:
+    - name: Read installed packages
+      ansible.builtin.package_facts:
+        manager: apt
+
+    - name: Verify baseline packages
+      ansible.builtin.assert:
+        that:
+          - "'ca-certificates' in ansible_facts.packages"
+          - "'sudo' in ansible_facts.packages"
+          - "'systemd-timesyncd' in ansible_facts.packages"
+          - "'tzdata' in ansible_facts.packages"
+          - "'util-linux' in ansible_facts.packages"
+          - "'e2fsprogs' in ansible_facts.packages"
+
+    - name: Read the managed automation account
+      ansible.builtin.command:
+        argv:
+          - id
+          - -Gn
+          - platform-automation
+      register: platform_automation_groups
+      changed_when: false
+
+    - name: Verify automation privilege scope
+      ansible.builtin.assert:
+        that:
+          - "'sudo' in platform_automation_groups.stdout.split()"
+
+    - name: Read the managed automation public key
+      ansible.builtin.slurp:
+        src: /home/platform-automation/.ssh/authorized_keys
+      register: platform_authorized_keys
+
+    - name: Verify the automation public key
+      ansible.builtin.assert:
+        that:
+          - (platform_authorized_keys.content | b64decode | trim) == platform_automation_public_key
+
+    - name: Check managed automation SSH directory permissions
+      ansible.builtin.stat:
+        path: /home/platform-automation/.ssh
+      register: platform_ssh_directory
+
+    - name: Check managed automation key permissions
+      ansible.builtin.stat:
+        path: /home/platform-automation/.ssh/authorized_keys
+      register: platform_authorized_key_file
+
+    - name: Require private SSH directory and key file modes
+      ansible.builtin.assert:
+        that:
+          - platform_ssh_directory.stat.mode == "0700"
+          - platform_authorized_key_file.stat.mode == "0600"
+
+    - name: Validate the managed sudoers file
+      ansible.builtin.command:
+        argv:
+          - visudo
+          - -cf
+          - /etc/sudoers.d/90-platform-automation
+      changed_when: false
+
+    - name: Resolve the configured timezone
+      ansible.builtin.command:
+        argv:
+          - readlink
+          - -f
+          - /etc/localtime
+      register: platform_timezone_target
+      changed_when: false
+
+    - name: Verify UTC timezone
+      ansible.builtin.assert:
+        that:
+          - platform_timezone_target.stdout == "/usr/share/zoneinfo/Etc/UTC"
+
+    - name: Read the journal size policy
+      ansible.builtin.slurp:
+        src: /etc/systemd/journald.conf.d/60-anitrend-platform.conf
+      register: platform_journal_policy
+
+    - name: Verify the journal size policy
+      ansible.builtin.assert:
+        that:
+          - "'SystemMaxUse=500M' in (platform_journal_policy.content | b64decode)"
+          - "'RuntimeMaxUse=100M' in (platform_journal_policy.content | b64decode)"
+
+    - name: Read managed data directories
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /srv/anitrend
+        - /var/lib/anitrend
+        - /var/backups/anitrend
+      register: platform_data_directories
+
+    - name: Verify managed data directories
+      ansible.builtin.assert:
+        that:
+          - item.stat.isdir
+          - item.stat.mode == "0750"
+      loop: "{{ platform_data_directories.results }}"

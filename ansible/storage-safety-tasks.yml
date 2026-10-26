@@ -1,0 +1,220 @@
+---
+- name: Require the VM's stable device identifier directory
+  ansible.builtin.stat:
+    path: /dev/disk/by-id
+  register: platform_storage_by_id_directory
+
+- name: Verify test-only stable identifiers cannot overwrite existing devices
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ platform_storage_existing_link }}"
+    - "{{ platform_storage_empty_link }}"
+  register: platform_storage_existing_links
+
+- name: Refuse to replace any existing stable device identifier
+  ansible.builtin.assert:
+    that:
+      - platform_storage_by_id_directory.stat.isdir
+      - not item.stat.exists
+    fail_msg: "Storage safety verification requires a free test-only /dev/disk/by-id name."
+  loop: "{{ platform_storage_existing_links.results }}"
+
+- name: Create the disposable loopback test directory
+  ansible.builtin.file:
+    path: "{{ platform_storage_safety_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create a disposable populated filesystem image
+  ansible.builtin.command:
+    argv:
+      - truncate
+      - -s
+      - 64M
+      - "{{ platform_storage_existing_image }}"
+  changed_when: true
+
+- name: Create a disposable empty filesystem image
+  ansible.builtin.command:
+    argv:
+      - truncate
+      - -s
+      - 64M
+      - "{{ platform_storage_empty_image }}"
+  changed_when: true
+
+- name: Attach the populated image to a fresh loop device
+  ansible.builtin.command:
+    argv:
+      - losetup
+      - --find
+      - --show
+      - "{{ platform_storage_existing_image }}"
+  register: platform_storage_existing_loop
+  changed_when: true
+
+- name: Attach the empty image to a fresh loop device
+  ansible.builtin.command:
+    argv:
+      - losetup
+      - --find
+      - --show
+      - "{{ platform_storage_empty_image }}"
+  register: platform_storage_empty_loop
+  changed_when: true
+
+- name: Create an existing filesystem on the populated test image
+  community.general.filesystem:
+    dev: "{{ platform_storage_existing_loop.stdout }}"
+    fstype: ext4
+    force: false
+    state: present
+
+- name: Mount the populated image temporarily to seed a preservation marker
+  ansible.posix.mount:
+    src: "{{ platform_storage_existing_loop.stdout }}"
+    path: "{{ platform_storage_existing_mount }}"
+    fstype: ext4
+    opts: defaults
+    state: ephemeral
+
+- name: Write a marker to the existing filesystem
+  ansible.builtin.copy:
+    dest: "{{ platform_storage_existing_mount }}/preserved.txt"
+    content: "existing-data-preserved\n"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Unmount the populated image before stable-device discovery
+  ansible.posix.mount:
+    path: "{{ platform_storage_existing_mount }}"
+    state: unmounted
+
+- name: Create the stable identifier for the populated loop device
+  ansible.builtin.file:
+    src: "{{ platform_storage_existing_loop.stdout }}"
+    dest: "{{ platform_storage_existing_link }}"
+    state: link
+    force: false
+
+- name: Create the stable identifier for the empty loop device
+  ansible.builtin.file:
+    src: "{{ platform_storage_empty_loop.stdout }}"
+    dest: "{{ platform_storage_empty_link }}"
+    state: link
+    force: false
+
+- name: Converge the populated device without formatting it
+  ansible.builtin.include_role:
+    name: platform_host_storage
+  vars:
+    platform_volumes:
+      - resource_id: loop-populated
+        reference: loop-populated
+        linux_device: "{{ platform_storage_existing_link }}"
+        filesystem: ext4
+        format_policy: never
+        mount_path: "{{ platform_storage_existing_mount }}"
+        size_gb: 1
+        data_classification: disposable-test-data
+        protected: false
+    platform_storage_allow_create_only_format: false
+
+- name: Verify the existing data marker survived storage convergence
+  ansible.builtin.slurp:
+    src: "{{ platform_storage_existing_mount }}/preserved.txt"
+  register: platform_storage_preserved_data
+
+- name: Require the existing filesystem data to remain unchanged
+  ansible.builtin.assert:
+    that:
+      - (platform_storage_preserved_data.content | b64decode | trim) == "existing-data-preserved"
+
+- name: Remove the populated test mount entry before the next scenario
+  ansible.posix.mount:
+    path: "{{ platform_storage_existing_mount }}"
+    state: absent
+
+- name: Refuse to format a blank device without create-only policy
+  block:
+    - name: Attempt storage convergence without format permission
+      ansible.builtin.include_role:
+        name: platform_host_storage
+      vars:
+        platform_volumes:
+          - resource_id: loop-empty-rejected
+            reference: loop-empty-rejected
+            linux_device: "{{ platform_storage_empty_link }}"
+            filesystem: ext4
+            format_policy: never
+            mount_path: "{{ platform_storage_empty_mount }}"
+            size_gb: 1
+            data_classification: disposable-test-data
+            protected: false
+        platform_storage_allow_create_only_format: true
+
+    - name: Fail if a blank device was formatted without explicit policy
+      ansible.builtin.fail:
+        msg: "The storage role unexpectedly accepted an unformatted device with format_policy=never."
+  rescue:
+    - name: Require the expected create-only policy guard to reject the blank device
+      ansible.builtin.assert:
+        that:
+          - "'Require explicit create-only authorization' in ansible_failed_task.name"
+
+    - name: Verify the rejected device remains unformatted
+      ansible.builtin.command:
+        argv:
+          - blkid
+          - --output
+          - value
+          - --match-tag
+          - TYPE
+          - --
+          - "{{ platform_storage_empty_link }}"
+      register: platform_storage_rejected_filesystem
+      changed_when: false
+      failed_when: platform_storage_rejected_filesystem.rc not in [0, 2]
+
+    - name: Require the rejected device to remain unformatted
+      ansible.builtin.assert:
+        that:
+          - platform_storage_rejected_filesystem.rc == 2
+
+- name: Create the explicitly authorized empty filesystem
+  ansible.builtin.include_role:
+    name: platform_host_storage
+  vars:
+    platform_volumes:
+      - resource_id: loop-empty-created
+        reference: loop-empty-created
+        linux_device: "{{ platform_storage_empty_link }}"
+        filesystem: ext4
+        format_policy: create-only
+        mount_path: "{{ platform_storage_empty_mount }}"
+        size_gb: 1
+        data_classification: empty
+        protected: false
+    platform_storage_allow_create_only_format: true
+
+- name: Verify create-only formatting produced the intended filesystem
+  ansible.builtin.command:
+    argv:
+      - blkid
+      - --output
+      - value
+      - --match-tag
+      - TYPE
+      - --
+      - "{{ platform_storage_empty_link }}"
+  register: platform_storage_created_filesystem
+  changed_when: false
+
+- name: Require the explicit create-only filesystem
+  ansible.builtin.assert:
+    that:
+      - platform_storage_created_filesystem.stdout | trim == "ext4"

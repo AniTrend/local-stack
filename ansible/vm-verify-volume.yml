@@ -1,0 +1,42 @@
+---
+- name: Resolve the expected block-device major and minor numbers
+  ansible.builtin.command:
+    argv:
+      - lsblk
+      - --nodeps
+      - --noheadings
+      - --output
+      - MAJ:MIN
+      - "{{ platform_volume.linux_device }}"
+  register: platform_vm_volume_major_minor
+  changed_when: false
+
+- name: Read the mounted block-device major and minor numbers
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - MAJ:MIN
+      - --mountpoint
+      - "{{ platform_volume.mount_path }}"
+  register: platform_vm_volume_mounted_major_minor
+  changed_when: false
+
+- name: Read the mounted filesystem type
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - FSTYPE
+      - --mountpoint
+      - "{{ platform_volume.mount_path }}"
+  register: platform_vm_volume_filesystem
+  changed_when: false
+
+- name: Require the declared device and filesystem to persist
+  ansible.builtin.assert:
+    that:
+      - platform_vm_volume_mounted_major_minor.stdout | trim == platform_vm_volume_major_minor.stdout | trim
+      - platform_vm_volume_filesystem.stdout | trim == platform_volume.filesystem

@@ -80,6 +80,7 @@
         "reference",
         "linux_device",
         "filesystem",
+        "format_policy",
         "mount_path",
         "size_gb",
         "data_classification",
@@ -90,11 +91,23 @@
         "reference": { "type": "string", "minLength": 1 },
         "linux_device": { "type": "string", "pattern": "^/dev/disk/by-id/[^\\s]+$" },
         "filesystem": { "const": "ext4" },
-        "mount_path": { "type": "string", "pattern": "^/[^\\s]*$" },
+        "format_policy": { "enum": ["never", "create-only"] },
+        "mount_path": { "type": "string", "pattern": "^/(?:srv|mnt|var/lib)/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$" },
         "size_gb": { "type": "integer", "minimum": 1, "maximum": 10000 },
         "data_classification": { "type": "string", "minLength": 1 },
         "protected": { "type": "boolean" }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "format_policy": { "const": "create-only" } },
+            "required": ["format_policy"]
+          },
+          "then": {
+            "properties": { "data_classification": { "const": "empty" } }
+          }
+        }
+      ]
     }
   }
 }

@@ -101,7 +101,7 @@
           "reference": { "type": "string", "minLength": 1 },
           "linux_device": { "type": "string", "minLength": 1 },
           "filesystem": { "const": "ext4" },
-          "mount_path": { "type": "string", "pattern": "^/[^\\s]*$" },
+          "mount_path": { "type": "string", "pattern": "^/(?:srv|mnt|var/lib)/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$" },
           "size_gb": { "type": "integer", "minimum": 1 },
           "data_classification": { "type": "string", "minLength": 1 },
           "protected": { "type": "boolean" }

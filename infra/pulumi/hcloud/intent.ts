@@ -233,12 +233,22 @@ export function parseEnvironmentIntent(value: unknown, configuredProjectRef: str
       !path.posix.isAbsolute(volume.mount_path) ||
       volume.mount_path === "/" ||
       path.posix.normalize(volume.mount_path) !== volume.mount_path ||
-      volume.mount_path.split("/").some((segment) => segment === "." || segment === "..")
+      volume.mount_path.split("/").some((segment) => segment === "." || segment === "..") ||
+      !/^\/(?:srv|mnt|var\/lib)\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(volume.mount_path)
     ) {
-      throw new Error(`volumes[${index}].mount_path must be a normalized absolute mount path`);
+      throw new Error(`volumes[${index}].mount_path must be a normalized data path under /srv, /mnt, or /var/lib`);
     }
     if (mountPaths.has(volume.mount_path)) {
       throw new Error(`volumes contains duplicate mount path ${volume.mount_path}`);
+    }
+    if (
+      [...mountPaths].some(
+        (existing) =>
+          volume.mount_path.startsWith(`${existing}/`) ||
+          existing.startsWith(`${volume.mount_path}/`),
+      )
+    ) {
+      throw new Error(`volumes contains overlapping mount path ${volume.mount_path}`);
     }
     mountPaths.add(volume.mount_path);
   }

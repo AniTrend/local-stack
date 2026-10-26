@@ -1,0 +1,13 @@
+---
+- name: Verify the managed automation account can reconnect
+  hosts: platform_target
+  gather_facts: false
+  tasks:
+    - name: Require the dedicated automation account
+      ansible.builtin.assert:
+        that:
+          - ansible_user == "platform-automation"
+        fail_msg: "Recovery checks must use the dedicated platform-automation account."
+
+    - name: Confirm SSH command execution
+      ansible.builtin.ping:

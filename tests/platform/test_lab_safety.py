@@ -89,6 +89,8 @@ def _run_cli(
         {
             str(collection_manifest_path): {
                 "community.docker": {"version": "5.0.0"},
+                "ansible.posix": {"version": "2.2.2"},
+                "community.general": {"version": "13.5.0"},
                 "community.library_inventory_filtering_v1": {"version": "1.1.5"},
             }
         }
@@ -369,6 +371,8 @@ def test_doctor_accepts_only_fully_pinned_local_toolchain(tmp_path: Path):
     assert "fixture-local" in result.stdout
     assert "ansible_collection_community_docker_version=5.0.0" in result.stdout
     assert "ansible_collection_community_library_inventory_filtering_v1_version=1.1.5" in result.stdout
+    assert "ansible_collection_ansible_posix_version=2.2.2" in result.stdout
+    assert "ansible_collection_community_general_version=13.5.0" in result.stdout
     assert "unix:///var/run/docker.sock" not in result.stdout
     commands = result.test_docker_log.read_text(encoding="utf-8").splitlines()
     assert all("prune" not in command.lower() and "swarm init" not in command.lower() for command in commands)
@@ -377,6 +381,8 @@ def test_doctor_rejects_user_level_ansible_collection_only(tmp_path: Path):
     global_collection_json = {
         "/user/collections/ansible_collections": {
             "community.docker": {"version": "5.0.0"},
+            "ansible.posix": {"version": "2.2.2"},
+            "community.general": {"version": "13.5.0"},
             "community.library_inventory_filtering_v1": {"version": "1.1.5"},
         }
     }
@@ -397,6 +403,8 @@ def test_doctor_rejects_wrong_pinned_ansible_collection_version(tmp_path: Path):
     wrong_version_json = {
         str(collection_manifest_path): {
             "community.docker": {"version": "4.9.0"},
+            "ansible.posix": {"version": "2.2.2"},
+            "community.general": {"version": "13.5.0"},
             "community.library_inventory_filtering_v1": {"version": "1.1.5"},
         }
     }

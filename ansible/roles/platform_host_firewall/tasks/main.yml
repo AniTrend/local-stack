@@ -1,0 +1,173 @@
+---
+- name: Require verified recovery SSH access before firewall changes
+  ansible.builtin.assert:
+    that:
+      - platform_firewall_recovery_access_verified | bool
+      - platform_firewall_policy is mapping
+      - platform_firewall_policy.ssh_source_cidrs is sequence
+      - platform_firewall_policy.ssh_source_cidrs is not string
+    fail_msg: "Verify the automation user's SSH recovery path before applying host firewall policy."
+
+- name: Read the active SSH peer before changing firewall rules
+  ansible.builtin.shell:
+    cmd: "printf '%s\\n' \"$SSH_CONNECTION\""
+    executable: /bin/sh
+  register: platform_firewall_ssh_connection
+  changed_when: false
+  become: false
+
+- name: Validate the active SSH connection declaration
+  ansible.builtin.assert:
+    that:
+      - platform_firewall_ssh_connection.stdout.split() | length == 4
+    fail_msg: "The active SSH connection does not expose a valid recovery peer."
+
+- name: Capture the active SSH peer address
+  ansible.builtin.set_fact:
+    platform_firewall_ssh_peer: "{{ platform_firewall_ssh_connection.stdout.split()[0] }}"
+
+- name: Require the active SSH peer to remain allowed
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - >-
+        import ipaddress, json, sys;
+        peer=ipaddress.ip_address(sys.argv[1]);
+        networks=[ipaddress.ip_network(value, strict=True) for value in json.loads(sys.argv[2])];
+        sys.exit(0 if any(peer in network for network in networks) else 1)
+      - "{{ platform_firewall_ssh_peer }}"
+      - "{{ platform_firewall_policy.ssh_source_cidrs | to_json }}"
+  register: platform_firewall_ssh_peer_allowed
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Abort before firewall changes if recovery SSH is not allowed
+  ansible.builtin.assert:
+    that:
+      - platform_firewall_ssh_peer_allowed.rc == 0
+    fail_msg: "The active SSH peer is not covered by the declared SSH source CIDRs."
+
+- name: Determine the host default-route interfaces
+  ansible.builtin.set_fact:
+    platform_firewall_ipv4_interface: "{{ ansible_facts.get('default_ipv4', {}).get('interface', '') }}"
+    platform_firewall_ipv6_interface: "{{ ansible_facts.get('default_ipv6', {}).get('interface', '') }}"
+    platform_firewall_ipv6_enabled: >-
+      {{ (ansible_facts.get('all_ipv6_addresses', [])
+          | reject('match', '^(fe80:|::1$)')
+          | list
+          | length) > 0
+         or (ansible_facts.get('default_ipv6', {}).get('interface', '') | length) > 0 }}
+
+- name: Require a usable default-route interface
+  ansible.builtin.assert:
+    that:
+      - >-
+        platform_firewall_ipv4_interface | length > 0 or
+        platform_firewall_ipv6_interface | length > 0
+      - >-
+        platform_firewall_ipv4_interface | length == 0 or
+        platform_firewall_ipv4_interface is match('^[A-Za-z0-9_.:-]{1,15}$')
+      - >-
+        platform_firewall_ipv6_interface | length == 0 or
+        platform_firewall_ipv6_interface is match('^[A-Za-z0-9_.:-]{1,15}$')
+    fail_msg: "The host firewall requires at least one validated default-route interface."
+
+- name: Install the iptables command package
+  ansible.builtin.apt:
+    name: iptables
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create protected firewall configuration directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - path: /etc/anitrend-platform
+      mode: "0750"
+    - path: /usr/local/libexec
+      mode: "0755"
+    - path: /etc/systemd/system/anitrend-platform-firewall.service.d
+      mode: "0755"
+    - path: /etc/systemd/system/docker.service.d
+      mode: "0755"
+
+- name: Install the platform firewall policy engine
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../tools/platform/host_firewall.py"
+    dest: /usr/local/libexec/anitrend-platform-firewall.py
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install the validated firewall policy
+  ansible.builtin.template:
+    src: firewall.json.j2
+    dest: /etc/anitrend-platform/firewall.json
+    owner: root
+    group: root
+    mode: "0640"
+
+- name: Install the persistent host firewall systemd unit
+  ansible.builtin.template:
+    src: platform-firewall.service.j2
+    dest: /etc/systemd/system/anitrend-platform-firewall.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload platform firewall units
+
+- name: Install the Docker firewall startup hook
+  ansible.builtin.template:
+    src: docker-firewall.conf.j2
+    dest: /etc/systemd/system/docker.service.d/50-anitrend-platform-firewall.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload platform firewall units
+
+- name: Enable and start the persistent host firewall
+  ansible.builtin.systemd_service:
+    name: anitrend-platform-firewall.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Reconcile host firewall rules and detect runtime drift
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - /usr/local/libexec/anitrend-platform-firewall.py
+      - input
+      - --config
+      - /etc/anitrend-platform/firewall.json
+  register: platform_firewall_input_result
+  changed_when: "'platform-firewall=changed' in platform_firewall_input_result.stdout"
+
+- name: Check whether the Docker daemon is active
+  ansible.builtin.command:
+    argv:
+      - systemctl
+      - is-active
+      - docker.service
+  register: platform_docker_service_state
+  changed_when: false
+  failed_when: false
+
+- name: Reconcile Docker forwarding policy when Docker is active
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - /usr/local/libexec/anitrend-platform-firewall.py
+      - docker
+      - --config
+      - /etc/anitrend-platform/firewall.json
+  register: platform_firewall_docker_result
+  changed_when: "'platform-firewall=changed' in platform_firewall_docker_result.stdout"
+  when: platform_docker_service_state.rc == 0

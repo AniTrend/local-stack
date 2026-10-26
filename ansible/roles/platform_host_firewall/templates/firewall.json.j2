@@ -1,0 +1,8 @@
+{
+  "ssh_source_cidrs": {{ platform_firewall_policy.ssh_source_cidrs | to_json }},
+  "public_routes": {{ platform_firewall_policy.public_routes | to_json }},
+  "private_routes": {{ platform_firewall_policy.private_routes | to_json }},
+  "ipv4_interface": {{ platform_firewall_ipv4_interface | to_json }},
+  "ipv6_enabled": {{ platform_firewall_ipv6_enabled | to_json }},
+  "ipv6_interface": {{ platform_firewall_ipv6_interface | to_json }}
+}

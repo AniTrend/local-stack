@@ -1,0 +1,24 @@
+---
+- name: Introduce disposable baseline drift
+  hosts: all
+  become: "{{ ansible_user | default('root') != 'root' }}"
+  tasks:
+    - name: Corrupt the configured timezone
+      ansible.builtin.copy:
+        dest: /etc/timezone
+        content: "Not/UTC\n"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Remove one managed data directory
+      ansible.builtin.file:
+        path: /srv/anitrend
+        state: absent
+
+    - name: Add a stale automation key
+      ansible.posix.authorized_key:
+        user: platform-automation
+        key: >-
+          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB stale-test-key
+        state: present

@@ -1,0 +1,189 @@
+---
+- name: Validate supported Tailscale host and scoped tag
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["distribution"] == "Ubuntu"
+      - ansible_facts["distribution_version"] == "24.04"
+      - ansible_facts["architecture"] in ["x86_64", "aarch64"]
+      - >-
+        (platform_architecture == "amd64" and ansible_facts["architecture"] == "x86_64")
+        or (platform_architecture == "arm64" and ansible_facts["architecture"] == "aarch64")
+      - platform_tailscale_tag is match('^tag:[a-z0-9][a-z0-9-]{0,62}$')
+      - platform_tailscale_hostname is match('^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$')
+    fail_msg: "Tailscale requires the inventory-matched Ubuntu 24.04 architecture and one approved tag."
+
+- name: Select the pinned Tailscale archive architecture
+  ansible.builtin.set_fact:
+    platform_tailscale_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'arm64' }}"
+
+- name: Download the checksum-pinned Tailscale static bundle
+  ansible.builtin.get_url:
+    url: >-
+      https://pkgs.tailscale.com/stable/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}.tgz
+    dest: "/var/tmp/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}.tgz"
+    checksum: "sha256:{{ platform_tailscale_checksums[platform_tailscale_arch] }}"
+    owner: root
+    group: root
+    mode: "0644"
+    timeout: 30
+
+- name: Unpack the verified Tailscale static bundle
+  ansible.builtin.unarchive:
+    src: "/var/tmp/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}.tgz"
+    dest: /var/tmp
+    remote_src: true
+    creates: "/var/tmp/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}"
+
+- name: Install the Tailscale client
+  ansible.builtin.copy:
+    src: "/var/tmp/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}/tailscale"
+    dest: /usr/bin/tailscale
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the Tailscale daemon
+  ansible.builtin.copy:
+    src: "/var/tmp/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}/tailscaled"
+    dest: /usr/sbin/tailscaled
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the upstream Tailscale systemd unit
+  ansible.builtin.copy:
+    src: "/var/tmp/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}/systemd/tailscaled.service"
+    dest: /etc/systemd/system/tailscaled.service
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Tailscale systemd unit
+
+- name: Install the upstream Tailscale defaults file
+  ansible.builtin.copy:
+    src: "/var/tmp/tailscale_{{ platform_tailscale_version }}_{{ platform_tailscale_arch }}/systemd/tailscaled.defaults"
+    dest: /etc/default/tailscaled
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload Tailscale systemd unit
+
+- name: Enable and start the Tailscale daemon
+  ansible.builtin.systemd_service:
+    name: tailscaled
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Read Tailscale backend state without exposing peer details
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/tailscale
+      - status
+      - --json
+  register: platform_tailscale_status_before
+  changed_when: false
+  failed_when: false
+  no_log: true
+  diff: false
+
+- name: Determine whether the node is already authenticated
+  ansible.builtin.set_fact:
+    platform_tailscale_is_running: >-
+      {{ platform_tailscale_status_before.rc == 0 and
+         (platform_tailscale_status_before.stdout | from_json).BackendState == 'Running' }}
+  no_log: true
+  diff: false
+
+- name: Require a first-enrollment auth key for an unauthenticated node
+  ansible.builtin.assert:
+    that:
+      - platform_tailscale_auth_key | length > 0
+    fail_msg: "An unauthenticated host requires a scoped Tailscale auth key."
+  when: not (platform_tailscale_is_running | bool)
+  no_log: true
+  diff: false
+
+- name: Authenticate the new Tailscale node with a short-lived protected key file
+  block:
+    - name: Write the temporary Tailscale auth key
+      ansible.builtin.copy:
+        dest: /run/platform-tailscale-auth-key
+        content: "{{ platform_tailscale_auth_key }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      diff: false
+
+    - name: Enroll the Tailscale node from the protected key file
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/tailscale
+          - up
+          - --reset
+          - "--auth-key=file:/run/platform-tailscale-auth-key"
+          - "--hostname={{ platform_tailscale_hostname }}"
+          - "--advertise-tags={{ platform_tailscale_tag }}"
+          - --accept-dns=false
+          - --accept-routes=false
+          - --advertise-routes=
+          - --advertise-exit-node=false
+          - --exit-node=
+          - --ssh=false
+          - --netfilter-mode=on
+          - --timeout=60s
+      no_log: true
+      diff: false
+  always:
+    - name: Remove the temporary Tailscale auth key
+      ansible.builtin.file:
+        path: /run/platform-tailscale-auth-key
+        state: absent
+      no_log: true
+      diff: false
+  when: not (platform_tailscale_is_running | bool)
+
+- name: Reconcile settings on an authenticated Tailscale node
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/tailscale
+      - up
+      - --reset
+      - "--hostname={{ platform_tailscale_hostname }}"
+      - "--advertise-tags={{ platform_tailscale_tag }}"
+      - --accept-dns=false
+      - --accept-routes=false
+      - --advertise-routes=
+      - --advertise-exit-node=false
+      - --exit-node=
+      - --ssh=false
+      - --netfilter-mode=on
+      - --timeout=60s
+  changed_when: false
+  when: platform_tailscale_is_running | bool
+  no_log: true
+  diff: false
+
+- name: Verify Tailscale connectivity without exposing peer details
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/tailscale
+      - status
+      - --json
+  register: platform_tailscale_status_after
+  changed_when: false
+  no_log: true
+  diff: false
+
+- name: Require an authenticated Tailscale node
+  ansible.builtin.assert:
+    that:
+      - (platform_tailscale_status_after.stdout | from_json).BackendState == "Running"
+    fail_msg: "Tailscale did not reach the authenticated Running state."
+  no_log: true
+  diff: false

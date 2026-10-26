@@ -120,6 +120,9 @@ export interface PulumiVolumeInventory {
   data_classification: string;
   protected: boolean;
 }
+export interface PulumiLabVmVolumeInventory extends PulumiVolumeInventory {
+  format_policy: "never" | "create-only";
+}
 
 export interface PulumiFirewallPolicy {
   ssh_source_cidrs: string[];
@@ -165,7 +168,7 @@ export interface PulumiLabVmInventory {
   provider: "external-vm";
   ssh_source_cidrs: string[];
   hosts: PulumiLabVmHostInventory[];
-  volumes: PulumiVolumeInventory[];
+  volumes: PulumiLabVmVolumeInventory[];
   architecture: "amd64" | "arm64";
   image_ref: string;
   native_execution: true;

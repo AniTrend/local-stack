@@ -53,6 +53,51 @@ def _validate_document(value: object, name: str, schema_path: Path) -> None:
         raise InventoryError(f"{name} failed schema validation at {location}")
 
 
+def _validate_create_only_storage(value: dict[str, object]) -> None:
+    volumes = value.get("volumes")
+    if not isinstance(volumes, list):
+        return
+    for volume in volumes:
+        if (
+            isinstance(volume, dict)
+            and volume.get("format_policy") == "create-only"
+            and volume.get("data_classification") != "empty"
+        ):
+            raise InventoryError("create-only formatting requires data_classification to be empty")
+
+
+def _canonical_network(value: object, description: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:
+    if not isinstance(value, str):
+        raise InventoryError(f"{description} must be a canonical CIDR")
+    try:
+        network = ipaddress.ip_network(value, strict=True)
+    except ValueError as error:
+        raise InventoryError(f"{description} must be a canonical CIDR") from error
+    if str(network) != value:
+        raise InventoryError(f"{description} must be a canonical CIDR")
+    return network
+
+
+def _validate_firewall_policy(policy: dict[str, object]) -> None:
+    ssh_sources = policy["ssh_source_cidrs"]
+    for cidr in ssh_sources:
+        if _canonical_network(cidr, "SSH source CIDR").prefixlen == 0:
+            raise InventoryError("SSH source policy cannot include a default route")
+
+    for route_type in ("public_routes", "private_routes"):
+        for route in policy[route_type]:
+            if route_type == "public_routes" and (
+                route["protocol"] not in {"http", "https"}
+                or (route["protocol"] == "http" and route["port"] != 80)
+                or (route["protocol"] == "https" and route["port"] != 443)
+            ):
+                raise InventoryError("public firewall routes are limited to HTTP 80 and HTTPS 443")
+            for cidr in route["source_cidrs"]:
+                network = _canonical_network(cidr, "firewall route source CIDR")
+                if route_type == "private_routes" and network.prefixlen == 0:
+                    raise InventoryError("private firewall route sources cannot include a default route")
+
+
 def _verify_trust_signature(
     trust_value: dict[str, object],
     trust_root_public_key: Ed25519PublicKey,
@@ -142,7 +187,15 @@ def prepare_inventory(
         inventory_schema = LAB_VM_INVENTORY_SCHEMA
     else:
         raise InventoryError("unsupported platform inventory schema version")
+    _validate_create_only_storage(inventory_value)
     _validate_document(inventory_value, "platform inventory", inventory_schema)
+    volume_values = inventory_value["volumes"]
+    if not isinstance(volume_values, list) or any(not isinstance(volume, dict) for volume in volume_values):
+        raise InventoryError("platform inventory contains invalid storage volumes")
+    mount_paths = sorted(volume["mount_path"] for volume in volume_values)
+    for parent, child in zip(mount_paths, mount_paths[1:]):
+        if child == parent or child.startswith(parent + "/"):
+            raise InventoryError("platform inventory contains duplicate or overlapping storage mount paths")
     if trust_value.get("schema_version") != SSH_HOST_TRUST_VERSION:
         raise InventoryError("unsupported SSH host trust schema version")
     _validate_document(trust_value, "SSH host trust", SSH_HOST_TRUST_SCHEMA)
@@ -176,18 +229,13 @@ def prepare_inventory(
         if address is None:
             raise InventoryError("HCloud inventory has no public SSH address")
         firewall_policy = inventory_value["firewall_policy"]
+    _validate_firewall_policy(firewall_policy)
 
     try:
         trusted_address = str(ipaddress.ip_address(trust_value["host"]["address"]))
         inventory_address = str(ipaddress.ip_address(address))
-        for cidr in firewall_policy["ssh_source_cidrs"]:
-            network = ipaddress.ip_network(cidr, strict=True)
-            if network.prefixlen == 0:
-                raise InventoryError("SSH source policy cannot include a default route")
-    except InventoryError:
-        raise
     except ValueError as error:
-        raise InventoryError("platform inventory contains an invalid SSH address or source CIDR") from error
+        raise InventoryError("platform inventory contains an invalid SSH address") from error
     if trusted_address != inventory_address:
         raise InventoryError("SSH host trust address does not match the inventory host address")
 
@@ -215,6 +263,11 @@ def prepare_inventory(
             "-o IdentitiesOnly=yes",
         )
     )
+    platform_volumes: list[dict[str, object]] = []
+    for volume in volume_values:
+        platform_volume = dict(volume)
+        platform_volume.setdefault("format_policy", "never")
+        platform_volumes.append(platform_volume)
     host_vars: dict[str, object] = {
         "ansible_connection": "ssh",
         "ansible_host": inventory_address,
@@ -232,7 +285,7 @@ def prepare_inventory(
         "platform_architecture": host["architecture"],
         "platform_os_image": host["os_image"],
         "platform_firewall_policy": firewall_policy,
-        "platform_volumes": inventory_value["volumes"],
+        "platform_volumes": platform_volumes,
     }
     trust_prefix = "@cert-authority " if trust_value["trust_type"] == "host_ca" else ""
     known_hosts_line = f"{trust_prefix}{inventory_address} {public_key}\n"

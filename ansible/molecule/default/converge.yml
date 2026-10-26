@@ -1,0 +1,9 @@
+---
+- name: Converge platform host baseline
+  hosts: all
+  become: "{{ ansible_user | default('root') != 'root' }}"
+  vars:
+    platform_environment: lab
+    platform_automation_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  roles:
+    - platform_host_baseline
