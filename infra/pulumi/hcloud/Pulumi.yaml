@@ -1,0 +1,8 @@
+name: anitrend-platform-hcloud
+description: Protected Hetzner Cloud resources for the AniTrend platform.
+backend:
+  url: https://api.pulumi.com
+runtime:
+  name: nodejs
+  options:
+    typescript: true

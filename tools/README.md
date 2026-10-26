@@ -44,4 +44,4 @@ docker stack deploy -c .rendered/docker-compose.infrastructure.rendered.yml infr
 
 ## Platform infrastructure helpers
 
-`tools/platform/lab.py` owns the disposable local Docker Pulumi lifecycle. It validates the selected daemon, creates uniquely labelled resources, exercises SSH and controlled updates, and removes only the active lab stack. See [the platform lab runbook](../docs/platform/local-lab.md).
+`tools/platform/lab.py` owns the disposable local Docker Pulumi lifecycle. `tools/platform/pulumi_preview.py` previews the active local lab or an already configured HCloud stack without applying changes. `make platform-pulumi-test ENV=lab` runs Docker and HCloud Pulumi mocks plus platform Python tests. See [the local lab runbook](../docs/platform/local-lab.md) and [HCloud provisioning contract](../docs/platform/pulumi-hcloud.md).

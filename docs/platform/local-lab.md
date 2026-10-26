@@ -49,10 +49,13 @@ Use this one lifecycle from the repository root:
 make platform-doctor ENV=lab
 make platform-lab-up ENV=lab
 make platform-lab-test ENV=lab
+make platform-preview ENV=lab
 make platform-lab-down ENV=lab
 ```
 
 `platform-lab-up` generates a UTC run ID, a temporary SSH keypair, a passphrase-protected local Pulumi stack, and uniquely labelled resources. It previews and applies the stack; a container healthcheck waits for the SSH listener before the command returns. `platform-lab-test` requires the second identical update to report no changes, inspects actual Docker state, verifies loopback-only SSH access and `uname -s`, changes the resource revision label, and verifies the controlled update. `platform-lab-down` verifies the Pulumi resource inventory and Docker ownership labels before destroying the active stack, then verifies removal. A missing inventory is treated as an empty checkpoint only before a successful preview or up, with no recorded outputs and no Docker object at the run's expected container, network, or volume names. Other missing inventories fail closed. It never invokes Docker prune or removes unrelated resources.
+
+`make platform-preview ENV=lab` requires an active, successfully applied lab stack and emits a non-mutating Docker Pulumi diff. It does not create or select a stack and never applies the preview.
 
 Only one lifecycle operation per checkout runs at a time. The run ID and stack name are printed by `up`; `test` and `down` use the active run record. An interrupted run can be reconciled with `make platform-lab-up ENV=lab` only from the same commit and lab-input fingerprint. Changes outside the lab input set do not block resume. If lab inputs changed, or the active manifest predates source fingerprints, run `make platform-lab-down ENV=lab` to clean the old stack before creating a new run.
 

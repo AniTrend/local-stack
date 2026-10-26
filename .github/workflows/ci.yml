@@ -125,7 +125,9 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
-          cache-dependency-path: infra/pulumi/docker/package-lock.json
+          cache-dependency-path: |
+            infra/pulumi/docker/package-lock.json
+            infra/pulumi/hcloud/package-lock.json
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
@@ -138,17 +140,17 @@ jobs:
         run: python -m pip install --require-hashes -r tools/platform/requirements.lock
       - name: Install pinned project-local Ansible collections
         run: ansible-galaxy collection install -p .tools/platform/collections -r ansible/requirements.yml
-      - name: Install locked Pulumi JavaScript dependencies
+      - name: Install locked Docker Pulumi dependencies
         run: npm exec --yes --package=npm@11.19.1 -- npm ci --prefix infra/pulumi/docker --no-audit --no-fund
-      - name: Run offline platform safety tests
+      - name: Install locked HCloud Pulumi dependencies
+        run: npm exec --yes --package=npm@11.19.1 -- npm ci --prefix infra/pulumi/hcloud --no-audit --no-fund
+      - name: Run offline Pulumi and platform tests
+        env:
+          PYTEST_ADDOPTS: --junitxml=.artifacts/platform/ci/platform-lab-python.xml
         run: >-
-          python -m pytest -q tests/platform/
-          --junitxml=.artifacts/platform/ci/platform-lab-python.xml
-      - name: Run Pulumi mock tests
-        run: >-
-          npm exec --yes --package=npm@11.19.1 -- npm test
-          --prefix infra/pulumi/docker
-          > .artifacts/platform/ci/platform-lab-pulumi.log 2>&1
+          npm exec --yes --package=npm@11.19.1 --
+          make platform-pulumi-test ENV=lab
+          > .artifacts/platform/ci/platform-pulumi-test.log 2>&1
       - name: Upload non-secret test evidence
         if: always()
         uses: actions/upload-artifact@v7
