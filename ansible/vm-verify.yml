@@ -159,6 +159,23 @@
       register: platform_docker_firewall_check
       changed_when: "'platform-firewall=changed' in platform_docker_firewall_check.stdout"
 
+    - name: Read the installed firewall policy for family validation
+      ansible.builtin.slurp:
+        src: /etc/anitrend-platform/firewall.json
+      register: platform_firewall_policy_raw
+
+    - name: Decode the installed firewall policy
+      ansible.builtin.set_fact:
+        platform_firewall_runtime_config: "{{ platform_firewall_policy_raw.content | b64decode | from_json }}"
+
+    - name: Require Docker IPv6 filtering when host IPv6 is enabled
+      ansible.builtin.assert:
+        that:
+          - >-
+            not (platform_firewall_runtime_config.ipv6_enabled | bool) or
+            'platform-firewall-docker-ipv6=unavailable' not in platform_docker_firewall_check.stdout
+        fail_msg: "Docker IPv6 filtering is unavailable while host IPv6 filtering is enabled."
+
     - name: Require Docker forwarding rules to have no drift
       ansible.builtin.assert:
         that:
@@ -281,6 +298,14 @@
           - /etc/anitrend-platform/firewall.json
       register: platform_rebooted_docker_firewall
       changed_when: "'platform-firewall=changed' in platform_rebooted_docker_firewall.stdout"
+
+    - name: Require Docker IPv6 hook persistence after reboot when host IPv6 is enabled
+      ansible.builtin.assert:
+        that:
+          - >-
+            not (platform_firewall_runtime_config.ipv6_enabled | bool) or
+            'platform-firewall-docker-ipv6=unavailable' not in platform_rebooted_docker_firewall.stdout
+        fail_msg: "Docker IPv6 filtering became unavailable after reboot."
 
     - name: Require Docker firewall persistence after reboot
       ansible.builtin.assert:

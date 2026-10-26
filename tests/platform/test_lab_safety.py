@@ -80,6 +80,13 @@ def _run_cli(
     pulumi_log = tmp_path / "pulumi-commands.log"
     env = os.environ.copy()
     env["PATH"] = str(bin_dir) + os.pathsep + env["PATH"]
+    env["PLATFORM_NODE_BIN"] = str(bin_dir / "node")
+    env["PLATFORM_NPM_BIN"] = str(bin_dir / "npm")
+    env["PLATFORM_PULUMI_BIN"] = str(bin_dir / "pulumi")
+    env["PLATFORM_PYTHON_BIN"] = str(bin_dir / "python3.14")
+    env["PLATFORM_ANSIBLE_BIN"] = str(bin_dir / "ansible-playbook")
+    env["PLATFORM_ANSIBLE_GALAXY_BIN"] = str(bin_dir / "ansible-galaxy")
+    env["PLATFORM_MOLECULE_BIN"] = str(bin_dir / "molecule")
     env["PLATFORM_TEST_ENDPOINT"] = endpoint
     collection_manifest_path = (repo_root / ".tools/platform/collections/ansible_collections").resolve()
     ansible_collections_path = repo_root / ".tools/platform/collections"

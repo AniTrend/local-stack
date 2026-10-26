@@ -40,6 +40,12 @@ class FirewallPolicy:
     ipv6_interface: str
 
 
+@dataclass(frozen=True, slots=True)
+class FirewallApplyResult:
+    changed: bool
+    unavailable_families: tuple[str, ...] = ()
+
+
 def _canonical_network(value: object, description: str) -> ipaddress.IPv4Network | ipaddress.IPv6Network:
     if not isinstance(value, str):
         raise FirewallError(f"{description} must be a canonical CIDR")
@@ -157,12 +163,7 @@ def build_input_rules(policy: FirewallPolicy, family: str) -> list[list[str]]:
 def build_docker_rules(policy: FirewallPolicy, family: str) -> list[list[str]]:
     if family not in {"ipv4", "ipv6"}:
         raise ValueError("family must be ipv4 or ipv6")
-    rules = [
-        ["-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "RETURN"],
-        ["-i", "docker0", "-j", "RETURN"],
-        ["-i", "br-+", "-j", "RETURN"],
-        ["-i", "docker_gwbridge", "-j", "RETURN"],
-    ]
+    rules = [["-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "RETURN"]]
     for route in _routes_for(policy):
         for cidr in route.source_cidrs:
             if _matches_family(cidr, family):
@@ -173,7 +174,7 @@ def build_docker_rules(policy: FirewallPolicy, family: str) -> list[list[str]]:
                         "-m",
                         "conntrack",
                         "--ctstate",
-                        "NEW",
+                        "DNAT",
                         "--ctorigdstport",
                         str(route.port),
                         "-s",
@@ -182,7 +183,12 @@ def build_docker_rules(policy: FirewallPolicy, family: str) -> list[list[str]]:
                         "RETURN",
                     ]
                 )
-    rules.append(["-j", "DROP"])
+    rules.extend(
+        [
+            ["-m", "conntrack", "--ctstate", "DNAT", "-j", "DROP"],
+            ["-j", "RETURN"],
+        ]
+    )
     return rules
 
 
@@ -300,20 +306,46 @@ def _ensure_chain(
         raise FirewallError("firewall policy verification failed after apply")
     return True
 
+def _docker_hook_available(binary: str) -> bool:
+    chain_result = _run(binary, ["-S", "DOCKER-USER"])
+    chain_error = chain_result.stderr + chain_result.stdout
+    if chain_result.returncode != 0:
+        if chain_result.returncode == 1 and "No chain/target/match by that name" in chain_error:
+            return False
+        raise FirewallError(f"could not inspect the {binary} Docker DOCKER-USER hook")
 
-def apply_policy(policy: FirewallPolicy, action: str) -> bool:
+    forward_result = _run(binary, ["-S", "FORWARD"])
+    if forward_result.returncode != 0:
+        raise FirewallError(f"could not inspect the {binary} FORWARD chain")
+    return "-A FORWARD -j DOCKER-USER" in forward_result.stdout.splitlines()
+
+
+def _docker_families(policy: FirewallPolicy) -> tuple[list[str], tuple[str, ...]]:
+    if not _docker_hook_available("iptables"):
+        raise FirewallError("Docker IPv4 DOCKER-USER hook is unavailable")
+
+    families = ["ipv4"]
+    unavailable: list[str] = []
+    if policy.ipv6_enabled:
+        if _docker_hook_available("ip6tables"):
+            families.append("ipv6")
+        else:
+            unavailable.append("ipv6")
+    return families, tuple(unavailable)
+
+
+def apply_policy(policy: FirewallPolicy, action: str) -> FirewallApplyResult:
     if action not in {"input", "docker"}:
         raise ValueError("action must be input or docker")
 
     changed = False
+    unavailable_families: tuple[str, ...] = ()
     if action == "input":
         families = ["ipv4"]
         if policy.ipv6_enabled:
             families.append("ipv6")
     else:
-        families = ["ipv4"]
-        if policy.ipv6_enabled:
-            families.append("ipv6")
+        families, unavailable_families = _docker_families(policy)
 
     for family in families:
         binary = "iptables" if family == "ipv4" else "ip6tables"
@@ -328,7 +360,7 @@ def apply_policy(policy: FirewallPolicy, action: str) -> bool:
             staging_names = ("ANITREND-DU-A", "ANITREND-DU-B")
             rules = build_docker_rules(policy, family)
         changed = _ensure_chain(binary, parent, active, staging_names, rules) or changed
-    return changed
+    return FirewallApplyResult(changed, unavailable_families)
 
 
 def _read_policy(path: Path) -> FirewallPolicy:
@@ -346,7 +378,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        changed = apply_policy(_read_policy(args.config), args.action)
+        result = apply_policy(_read_policy(args.config), args.action)
     except FirewallError as error:
         print(f"platform firewall: {error}", file=sys.stderr)
         return 2
@@ -354,7 +386,9 @@ def main(argv: list[str] | None = None) -> int:
         print("platform firewall: a local netfilter command failed", file=sys.stderr)
         return 2
 
-    print("platform-firewall=changed" if changed else "platform-firewall=unchanged")
+    for family in result.unavailable_families:
+        print(f"platform-firewall-docker-{family}=unavailable")
+    print("platform-firewall=changed" if result.changed else "platform-firewall=unchanged")
     return 0
 
 
