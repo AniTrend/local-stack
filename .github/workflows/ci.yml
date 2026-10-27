@@ -29,6 +29,24 @@ jobs:
             echo "No compose files found"
           fi
 
+  platform-inventory:
+    name: Platform inventory validation
+    needs: [lint]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.15'
+      - name: Install inventory test dependencies
+        run: python -m pip install -r tools/requirements.txt pytest==8.4.2
+      - name: Validate read-only inventory and safety contracts
+        run: python -m pytest -q tests/platform/test_inventory.py
+
   trivy-scan:
     needs: [lint]
     name: Filesystem scan

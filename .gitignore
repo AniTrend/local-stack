@@ -22,3 +22,6 @@ __pycache__/
 
 # Doco-CD bootstrap secrets
 doco-cd/secrets/
+
+# Normalized host inventory artifacts remain local and private.
+.artifacts/platform/

@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:anitrend:platform:inventory:v1",
+  "title": "AniTrend platform runtime inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "environment",
+    "observed_at_utc",
+    "collector_commit",
+    "collector_worktree_clean",
+    "docker",
+    "repository_services",
+    "unmatched_containers",
+    "collection_issues",
+    "environment_contract",
+    "reconciliation"
+  ],
+  "properties": {
+    "schema_version": { "const": "anitrend.platform.inventory.v1" },
+    "run_id": { "type": "string", "pattern": "^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$" },
+    "environment": { "enum": ["lab", "legacy", "rehearsal", "production"] },
+    "observed_at_utc": { "type": "string", "format": "date-time" },
+    "collector_commit": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|unknown)$" },
+    "collector_worktree_clean": { "type": "boolean" },
+    "docker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_name",
+        "endpoint_kind",
+        "client_version",
+        "server_version",
+        "operating_system",
+        "architecture",
+        "swarm_state",
+        "swarm_manager",
+        "cpu_count",
+        "memory_total_bytes",
+        "container_count",
+        "running_count",
+        "resource_usage_status",
+        "containers",
+        "volumes",
+        "volume_inventory_status",
+        "host_timers"
+      ],
+      "properties": {
+        "context_name": { "type": "string", "minLength": 1 },
+        "endpoint_kind": { "enum": ["local_unix", "local_npipe", "remote_ssh", "remote_tcp", "unknown"] },
+        "client_version": { "type": "string" },
+        "server_version": { "type": "string" },
+        "operating_system": { "type": "string" },
+        "architecture": { "type": "string" },
+        "swarm_state": { "type": "string" },
+        "swarm_manager": { "type": "boolean" },
+        "cpu_count": { "type": "integer", "minimum": 0 },
+        "memory_total_bytes": { "type": "integer", "minimum": 0 },
+        "container_count": { "type": "integer", "minimum": 0 },
+        "running_count": { "type": "integer", "minimum": 0 },
+        "resource_usage_status": { "enum": ["collected", "partial", "unavailable", "not_applicable"] },
+        "containers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/container" }
+        },
+        "volumes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/volume" }
+        },
+        "volume_inventory_status": { "enum": ["collected", "unavailable"] },
+        "host_timers": { "$ref": "#/$defs/timerInventory" }
+      }
+    },
+    "repository_services": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repositoryService" }
+    },
+    "unmatched_containers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/unmatchedContainer" }
+    },
+    "collection_issues": { "type": "array", "items": { "type": "string" } },
+    "environment_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "target_environment", "inputs"],
+      "properties": {
+        "schema_version": { "const": "anitrend.platform.environment.v1" },
+        "target_environment": { "const": "production" },
+        "inputs": { "type": "object" }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "blocked_reasons"],
+      "properties": {
+        "decision": { "enum": ["pass", "fail", "blocked", "skipped"] },
+        "blocked_reasons": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  },
+  "$defs": {
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "image_ref",
+        "image_id",
+        "repo_digests",
+        "image_os",
+        "image_architecture",
+        "state",
+        "health",
+        "compose_project",
+        "compose_service",
+        "source_service_id",
+        "ports",
+        "networks",
+        "mounts",
+        "resource_limits",
+        "resource_usage",
+        "container_layer_size_bytes",
+        "rootfs_size_bytes",
+        "restart_policy"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "name": { "type": "string" },
+        "image_ref": { "type": "string" },
+        "image_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "repo_digests": { "type": "array", "items": { "type": "string" } },
+        "image_os": { "type": ["string", "null"] },
+        "image_architecture": { "type": ["string", "null"] },
+        "state": { "type": "string" },
+        "health": { "enum": ["healthy", "unhealthy", "starting", "unknown"] },
+        "compose_project": { "type": ["string", "null"] },
+        "compose_service": { "type": ["string", "null"] },
+        "source_service_id": { "type": ["string", "null"] },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["container_port", "protocol", "host_port", "host_address_scope", "address_family"],
+            "properties": {
+              "container_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+              "protocol": { "type": "string" },
+              "host_port": { "type": ["integer", "null"], "minimum": 1, "maximum": 65535 },
+              "host_address_scope": { "enum": ["wildcard", "loopback", "private", "public", "other", "unknown"] },
+              "address_family": { "enum": ["ipv4", "ipv6", "unknown"] }
+            }
+          }
+        },
+        "networks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "aliases"],
+            "properties": {
+              "name": { "type": "string" },
+              "aliases": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "mounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "name", "source_path", "destination", "read_only", "size_bytes", "size_status"],
+            "properties": {
+              "type": { "type": "string" },
+              "name": { "type": ["string", "null"] },
+              "source_path": { "type": ["string", "null"] },
+              "destination": { "type": "string" },
+              "read_only": { "type": "boolean" },
+              "size_bytes": { "type": ["integer", "null"], "minimum": 0 },
+              "size_status": { "enum": ["measured", "unknown"] }
+            }
+          }
+        },
+        "resource_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["memory_bytes", "nano_cpus"],
+          "properties": {
+            "memory_bytes": { "type": "integer", "minimum": 0 },
+            "nano_cpus": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "resource_usage": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "cpu_percent",
+            "memory_used_bytes",
+            "memory_limit_bytes",
+            "memory_percent",
+            "network_received_bytes",
+            "network_sent_bytes",
+            "block_read_bytes",
+            "block_written_bytes",
+            "pid_count"
+          ],
+          "properties": {
+            "cpu_percent": { "type": ["number", "null"], "minimum": 0 },
+            "memory_used_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "memory_limit_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "memory_percent": { "type": ["number", "null"], "minimum": 0 },
+            "network_received_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "network_sent_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "block_read_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "block_written_bytes": { "type": ["integer", "null"], "minimum": 0 },
+            "pid_count": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        },
+        "container_layer_size_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "rootfs_size_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "restart_policy": { "type": "string" }
+      }
+    },
+    "volume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "driver", "scope", "links", "size_bytes", "size_status"],
+      "properties": {
+        "name": { "type": "string" },
+        "driver": { "type": "string" },
+        "scope": { "type": "string" },
+        "links": { "type": ["integer", "null"], "minimum": 0 },
+        "size_bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "size_status": { "enum": ["measured", "unknown"] }
+      }
+    },
+    "timerInventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "units"],
+      "properties": {
+        "status": { "enum": ["collected", "not_local_linux", "unavailable"] },
+        "units": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["unit", "next", "last", "activates"],
+            "properties": {
+              "unit": { "type": "string" },
+              "next": { "type": ["string", "null"] },
+              "last": { "type": ["string", "null"] },
+              "activates": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "repositoryService": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "source_repository",
+        "source_path",
+        "compose_project",
+        "service",
+        "image_ref",
+        "container_name",
+        "depends_on",
+        "declared_mounts",
+        "configuration_refs",
+        "restart_policy",
+        "stack_extension",
+        "runtime_match_status",
+        "runtime_match_method",
+        "runtime_type",
+        "runtime_container_ids",
+        "current_deployment_owner",
+        "target_deployment_owner",
+        "disposition",
+        "ingress_class",
+        "data_classification",
+        "health_contract",
+        "database_runtime",
+        "writer_job_map_ref",
+        "external_provider_map_ref",
+        "backup_restore_method_ref",
+        "evidence_refs"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "source_repository": { "const": "AniTrend/local-stack" },
+        "source_path": { "type": "string" },
+        "compose_project": { "type": "string" },
+        "service": { "type": "string" },
+        "image_ref": { "type": ["string", "null"] },
+        "container_name": { "type": ["string", "null"] },
+        "depends_on": { "type": "array", "items": { "type": "string" } },
+        "declared_mounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "source", "target", "read_only"],
+            "properties": {
+              "type": { "type": "string" },
+              "source": { "type": "string" },
+              "target": { "type": "string" },
+              "read_only": { "type": "boolean" }
+            }
+          }
+        },
+        "configuration_refs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "ref"],
+            "properties": {
+              "kind": { "enum": ["env_file", "secret", "config"] },
+              "ref": { "type": "string" }
+            }
+          }
+        },
+        "restart_policy": { "type": ["string", "null"] },
+        "stack_extension": { "type": ["string", "null"] },
+        "runtime_match_status": { "enum": ["matched", "not_observed", "ambiguous"] },
+        "runtime_match_method": { "enum": ["compose-labels", "container-name", "not-observed", "ambiguous"] },
+        "runtime_type": { "enum": ["docker-compose", "docker-container", "not_observed", "ambiguous"] },
+        "runtime_container_ids": { "type": "array", "items": { "type": "string" } },
+        "current_deployment_owner": { "type": "string" },
+        "target_deployment_owner": { "type": "string" },
+        "disposition": { "enum": ["migrate", "retain", "retire", "absent", "unresolved"] },
+        "ingress_class": { "enum": ["public", "private", "internal", "none", "unresolved"] },
+        "data_classification": { "type": "string" },
+        "health_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "source_healthcheck_declared", "runtime_health_states", "evidence_ref"],
+          "properties": {
+            "status": { "enum": ["confirmed", "unresolved", "not_applicable"] },
+            "source_healthcheck_declared": { "type": "boolean" },
+            "runtime_health_states": {
+              "type": "array",
+              "items": { "enum": ["healthy", "unhealthy", "starting", "unknown"] }
+            },
+            "evidence_ref": { "type": ["string", "null"] }
+          }
+        },
+        "database_runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "server_version", "topology_ref", "data_paths"],
+          "properties": {
+            "status": { "enum": ["confirmed", "unresolved", "not_applicable"] },
+            "server_version": { "type": ["string", "null"] },
+            "topology_ref": { "type": ["string", "null"] },
+            "data_paths": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "writer_job_map_ref": { "type": ["string", "null"] },
+        "external_provider_map_ref": { "type": ["string", "null"] },
+        "backup_restore_method_ref": { "type": ["string", "null"] },
+        "evidence_refs": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "unmatchedContainer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["container_id", "name", "compose_project", "compose_service", "disposition", "deployment_owner", "evidence_ref"],
+      "properties": {
+        "container_id": { "type": "string" },
+        "name": { "type": "string" },
+        "compose_project": { "type": ["string", "null"] },
+        "compose_service": { "type": ["string", "null"] },
+        "disposition": { "enum": ["migrate", "retain", "retire", "absent", "unresolved"] },
+        "deployment_owner": { "type": "string" },
+        "evidence_ref": { "type": "string" }
+      }
+    }
+  }
+}
