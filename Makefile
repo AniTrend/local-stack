@@ -31,7 +31,7 @@ ifneq ($(wildcard $(PLATFORM_TOOLS_BIN)/pulumi),)
 export PATH := $(abspath $(PLATFORM_TOOLS_BIN)):$(PATH)
 endif
 
-.PHONY: help platform-doctor platform-lab-up platform-lab-test platform-lab-down platform-pulumi-test platform-ansible-test platform-host-verify platform-preview
+.PHONY: help platform-doctor platform-lab-up platform-lab-test platform-lab-down platform-pulumi-test platform-ansible-test platform-host-verify platform-preview platform-evidence-validate
 
 help:
 	@printf '%s\n' \
@@ -45,7 +45,9 @@ help:
 	  '  make platform-preview ENV=lab|rehearsal|production' \
 	  'Platform Ansible:' \
 	  '  make platform-ansible-test ENV=lab' \
-	  '  make platform-host-verify ENV=lab TIER=vm'
+	  '  make platform-host-verify ENV=lab TIER=vm' \
+	  'Platform evidence (record validation, not gate approval):' \
+	  '  make platform-evidence-validate ENV=lab TIER=docker|vm MANIFEST=FILE COMMIT=FULL_SHA'
 
 platform-doctor:
 	@test "$(ENV)" = "lab" || { printf '%s\n' 'ENV=lab is required for platform-doctor' >&2; exit 2; }
@@ -81,6 +83,13 @@ platform-host-verify:
 	@test "$(ENV)" = "lab" || { printf '%s\n' 'ENV=lab is required for platform-host-verify' >&2; exit 2; }
 	@test "$(TIER)" = "vm" || { printf '%s\n' 'TIER=vm is required for platform-host-verify' >&2; exit 2; }
 	@$(PLATFORM_PYTHON_BIN) $(PLATFORM_ANSIBLE_RUNNER) host-verify --environment "$(ENV)" --tier "$(TIER)"
+
+platform-evidence-validate:
+	@test -n "$(ENV)" || { printf '%s\n' 'ENV is required for platform-evidence-validate' >&2; exit 2; }
+	@test -n "$(TIER)" || { printf '%s\n' 'TIER=docker or TIER=vm is required' >&2; exit 2; }
+	@test -n "$(MANIFEST)" || { printf '%s\n' 'MANIFEST must identify an existing evidence record' >&2; exit 2; }
+	@test -n "$(COMMIT)" || { printf '%s\n' 'COMMIT must be the exact full candidate SHA' >&2; exit 2; }
+	@$(PLATFORM_PYTHON_BIN) tools/platform/evidence.py --manifest "$(MANIFEST)" --environment "$(ENV)" --tier "$(TIER)" --commit "$(COMMIT)"
 
 .DEFAULT:
 	@printf 'No rule for target "%s"; unimplemented platform commands fail closed.\n' "$@" >&2
