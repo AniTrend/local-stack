@@ -45,7 +45,7 @@ jobs:
       - name: Install inventory test dependencies
         run: python -m pip install -r tools/requirements.txt pytest==8.4.2
       - name: Validate read-only inventory and safety contracts
-        run: python -m pytest -q tests/platform/test_inventory.py
+        run: python -m pytest -q tests/platform
 
   trivy-scan:
     needs: [lint]

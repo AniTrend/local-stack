@@ -25,6 +25,7 @@ ENVIRONMENTS = ("lab", "legacy", "rehearsal", "production")
 DEFAULT_ARTIFACT_ROOT = ".artifacts/platform"
 EXCLUDED_SOURCE_PARTS = {".git", ".rendered", ".venv", "node_modules", "stacks", "__pycache__"}
 
+
 CONTAINER_INSPECT_FORMAT = (
     r'{{printf "{\"id\":%s,\"name\":%s,\"image_ref\":%s,'
     r'\"image_id\":%s,\"state\":%s,\"project\":%s,\"service\":%s,'
@@ -294,19 +295,34 @@ def _normalize_stats(raw: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     }
 
 
+def _systemd_timestamp(value: Any) -> Optional[str]:
+    """Normalize systemd's integer microseconds without losing precision."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0 or value == 2**64 - 1:
+        return None
+    seconds, microseconds = divmod(value, 1_000_000)
+    try:
+        timestamp = datetime.fromtimestamp(seconds, timezone.utc).replace(microsecond=microseconds)
+        return timestamp.isoformat().replace("+00:00", "Z")
+    except (OSError, ValueError, OverflowError):
+        return None
+
+
 def _collect_timers(endpoint_kind: str) -> Dict[str, Any]:
+    # A local Docker Unix socket does not prove the engine shares the collector
+    # host (Docker Desktop for Linux runs its engine in a VM), so these timers are
+    # explicitly recorded as collector-host observations.
     if endpoint_kind != "local_unix" or not sys.platform.startswith("linux"):
-        return {"status": "not_local_linux", "units": []}
+        return {"status": "not_local_linux", "host_scope": "collector", "units": []}
     if shutil.which("systemctl") is None:
-        return {"status": "unavailable", "units": []}
+        return {"status": "unavailable", "host_scope": "collector", "units": []}
     command = ["systemctl", "list-timers", "--all", "--no-pager", "--no-legend", "--output=json"]
     try:
         output = _run_command(command, timeout=15)
         timers = json.loads(output) if output.strip() else []
     except (InventoryError, json.JSONDecodeError):
-        return {"status": "unavailable", "units": []}
+        return {"status": "unavailable", "host_scope": "collector", "units": []}
     if not isinstance(timers, list):
-        return {"status": "unavailable", "units": []}
+        return {"status": "unavailable", "host_scope": "collector", "units": []}
     units = []
     for timer in timers:
         if not isinstance(timer, dict) or not isinstance(timer.get("unit"), str):
@@ -314,12 +330,16 @@ def _collect_timers(endpoint_kind: str) -> Dict[str, Any]:
         units.append(
             {
                 "unit": timer["unit"],
-                "next": timer.get("next") if isinstance(timer.get("next"), str) else None,
-                "last": timer.get("last") if isinstance(timer.get("last"), str) else None,
-                "activates": timer.get("activates") if isinstance(timer.get("activates"), str) else None,
+                "next": _systemd_timestamp(timer.get("next")),
+                "last": _systemd_timestamp(timer.get("last")),
+                "activates": timer.get("activates") if isinstance(timer.get("activates"), str) else "unknown",
             }
         )
-    return {"status": "collected", "units": sorted(units, key=lambda item: item["unit"])}
+    return {
+        "status": "collected",
+        "host_scope": "collector",
+        "units": sorted(units, key=lambda item: item["unit"]),
+    }
 
 
 
@@ -456,6 +476,17 @@ def _source_service_records(repo_root: Path) -> Tuple[List[Dict[str, Any]], List
     return services, errors
 
 
+def _parse_link_count(value: Any) -> Optional[int]:
+    """Parse Docker's string-valued volume reference counts."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.isdecimal():
+        return int(value)
+    return None
+
+
 def _collect_volume_rows(context: str) -> Tuple[List[Dict[str, Any]], Dict[str, Optional[int]], str]:
     try:
         output = _run_docker(["system", "df", "--verbose", "--format", "json"], context, timeout=120)
@@ -479,7 +510,7 @@ def _collect_volume_rows(context: str) -> Tuple[List[Dict[str, Any]], Dict[str, 
                 "name": name,
                 "driver": volume.get("Driver") if isinstance(volume.get("Driver"), str) else "unknown",
                 "scope": volume.get("Scope") if isinstance(volume.get("Scope"), str) else "unknown",
-                "links": volume.get("Links") if isinstance(volume.get("Links"), int) else None,
+                "links": _parse_link_count(volume.get("Links")),
                 "size_bytes": size_bytes,
                 "size_status": "measured" if size_bytes is not None else "unknown",
             }
@@ -730,7 +761,7 @@ def _collect_docker(environment: str, requested_context: Optional[str]) -> Tuple
         "containers": sorted(containers, key=lambda item: item["name"]),
         "volumes": volume_rows,
         "volume_inventory_status": volume_status,
-        "host_timers": timers,
+        "collector_host_timers": timers,
     }
     return docker, errors
 
@@ -801,14 +832,18 @@ def _reconciliation_validation_error(payload: Dict[str, Any]) -> Optional[str]:
     unresolved = unresolved or payload["docker"]["volume_inventory_status"] != "collected"
     if payload["docker"]["running_count"] and payload["docker"]["resource_usage_status"] != "collected":
         unresolved = True
-    for item in payload["environment_contract"]["inputs"].values():
-        if item["status"] not in ("confirmed", "not_applicable") or not item["evidence_ref"]:
-            unresolved = True
-        if item["status"] == "confirmed" and item["value"] is None:
-            unresolved = True
-        if item["status"] == "not_applicable" and item["value"] is not None:
-            unresolved = True
     inputs = payload["environment_contract"]["inputs"]
+    # All current production inputs are required by G0. No exemption rule has
+    # been approved for this contract, so a not_applicable input cannot pass.
+    for item in inputs.values():
+        if item["status"] != "confirmed" or not item["evidence_ref"] or not item["evidence_ref"].strip():
+            unresolved = True
+        if item["value"] is None or (isinstance(item["value"], str) and not item["value"].strip()):
+            unresolved = True
+    observed_context = payload["docker"]["context_name"].strip()
+    allowed = inputs["allowed_docker_contexts"]["value"]
+    if not isinstance(allowed, list) or not observed_context or observed_context not in allowed:
+        unresolved = True
     if inputs["provider"]["status"] != "confirmed" or inputs["provider"]["value"] != "hcloud":
         unresolved = True
     required_safety_policy = {
@@ -825,6 +860,8 @@ def _reconciliation_validation_error(payload: Dict[str, Any]) -> Optional[str]:
         if service["runtime_match_status"] == "ambiguous":
             unresolved = True
         for field in ("current_deployment_owner", "target_deployment_owner"):
+            if not service[field].strip():
+                unresolved = True
             if any(token in service[field].lower() for token in ("unknown", "unresolved", "pending")):
                 unresolved = True
         if (
@@ -837,8 +874,60 @@ def _reconciliation_validation_error(payload: Dict[str, Any]) -> Optional[str]:
             or not service["evidence_refs"]
         ):
             unresolved = True
+        if service["health_contract"]["status"] == "confirmed" and not service["health_contract"].get("evidence_ref"):
+            unresolved = True
+        if service["database_runtime"]["status"] == "confirmed":
+            if (
+                not service["database_runtime"].get("server_version")
+                or not service["database_runtime"].get("topology_ref")
+                or not service["database_runtime"].get("data_paths")
+            ):
+                unresolved = True
+    observed_containers = {
+        container["id"]: container
+        for container in payload["docker"]["containers"]
+        if isinstance(container.get("id"), str) and container["id"]
+    }
+    if len(observed_containers) != len(payload["docker"]["containers"]):
+        unresolved = True
+    services_by_id = {service["id"]: service for service in payload["repository_services"]}
+    if len(services_by_id) != len(payload["repository_services"]):
+        unresolved = True
+    for observed in observed_containers.values():
+        service_id = observed.get("source_service_id")
+        if service_id is not None and (
+            service_id not in services_by_id
+            or observed["id"] not in services_by_id[service_id]["runtime_container_ids"]
+        ):
+            unresolved = True
+    for service in services_by_id.values():
+        runtime_ids = service["runtime_container_ids"]
+        if len(runtime_ids) != len(set(runtime_ids)) or any(
+            container_id not in observed_containers
+            or observed_containers[container_id].get("source_service_id") != service["id"]
+            for container_id in runtime_ids
+        ):
+            unresolved = True
+    unmatched_ids = [container.get("container_id") for container in payload["unmatched_containers"]]
+    if len(unmatched_ids) != len(set(unmatched_ids)):
+        unresolved = True
+    if set(unmatched_ids) != {
+        container["id"] for container in observed_containers.values() if container.get("source_service_id") is None
+    }:
+        unresolved = True
     for container in payload["unmatched_containers"]:
-        if container["disposition"] == "unresolved" or "unknown" in container["deployment_owner"].lower():
+        owner = str(container.get("deployment_owner") or "").strip()
+        if not owner or any(token in owner.lower() for token in ("unknown", "unresolved", "pending")):
+            unresolved = True
+        if container["disposition"] == "unresolved":
+            unresolved = True
+        observed = observed_containers.get(container["container_id"])
+        if (
+            observed is None
+            or observed.get("name") != container.get("name")
+            or observed.get("compose_project") != container.get("compose_project")
+            or observed.get("compose_service") != container.get("compose_service")
+        ):
             unresolved = True
     if unresolved:
         return "reconciliation gate cannot pass while required inventory fields are unresolved"

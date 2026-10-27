@@ -56,3 +56,7 @@ make platform-inventory-validate ENV=legacy
 Schema validity is separate from migration readiness. Validation prints the reconciliation gate state; `gate=blocked` is not a completed inventory or a production pass. The public report belongs in `docs/platform/live-inventory.md` and must omit private host paths, addresses, unrelated workload names, and raw runtime exports.
 
 The versioned inventory and environment intent schemas live in `infra/pulumi/shared/`. The environment contract uses typed values, explicit resolution status, and opaque evidence references; credential fields accept reference names only.
+
+The pass-reconciliation check requires all current production environment inputs to be confirmed with concrete values and evidence references; this contract defines no automatic `not_applicable` exemption. It also binds the observed context to its approved allowlist and cross-checks every observed container against its service or unmatched-owner record. Confirmed health and database facts need their supporting evidence, version/topology and data paths.
+
+`docker.collector_host_timers` explicitly describes the collector workstation, not the Docker engine host. A local Unix socket can lead to a Docker Desktop VM. The source host's actual job/writer map therefore still needs independent confirmation. Timestamp fields are UTC ISO 8601 or null for unavailable values. Recollect pre-repair artifacts rather than renaming their old timer field; schema validity and actual G0 acceptance remain separate.

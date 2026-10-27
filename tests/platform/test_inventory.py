@@ -114,9 +114,10 @@ def make_toolchain(tmp_path: Path, endpoint: str) -> Tuple[Path, Path]:
             elif args[:2] == ["system", "df"]:
                 print(json.dumps({{
                     "Volumes": [
-                        {{"Name": "fixture-data", "Driver": "local", "Scope": "local", "Links": 1, "Size": "744MB", "Mountpoint": "/private/docker/root", "Labels": {{"secret": {SECRET_SENTINEL!r}}}}},
-                        {{"Name": "fixture-binary", "Driver": "local", "Scope": "local", "Links": 0, "Size": "1.5GiB", "Mountpoint": "/private/docker/root2", "Labels": {{}}}},
-                        {{"Name": "fixture-empty", "Driver": "local", "Scope": "local", "Links": 0, "Size": "0B", "Mountpoint": "/private/docker/root3", "Labels": {{}}}},
+                        {{"Name": "fixture-data", "Driver": "local", "Scope": "local", "Links": "1", "Size": "744MB", "Mountpoint": "/private/docker/root", "Labels": {{"secret": {SECRET_SENTINEL!r}}}}},
+                        {{"Name": "fixture-binary", "Driver": "local", "Scope": "local", "Links": "0", "Size": "1.5GiB", "Mountpoint": "/private/docker/root2", "Labels": {{}}}},
+                        {{"Name": "fixture-empty", "Driver": "local", "Scope": "local", "Links": "0", "Size": "0B", "Mountpoint": "/private/docker/root3", "Labels": {{}}}},
+                        {{"Name": "fixture-unparseable", "Driver": "local", "Scope": "local", "Links": "invalid", "Size": "0B", "Mountpoint": "/private/docker/root4", "Labels": {{}}}},
                     ]
                 }}))
             else:
@@ -135,7 +136,8 @@ def make_toolchain(tmp_path: Path, endpoint: str) -> Tuple[Path, Path]:
             #!/usr/bin/env python3
             import json
             print(json.dumps([
-                {"unit": "backup.timer", "next": "2026-10-26 02:00:00 UTC", "last": "2026-10-25 02:00:00 UTC", "activates": "backup.service"}
+                {"unit": "backup.timer", "next": 1734381600000000, "last": 1734295200000000, "activates": "backup.service"},
+                {"unit": "unparseable.timer", "next": "unknown", "last": "unknown", "activates": "unknown.service"}
             ]))
             """
         ),
@@ -288,10 +290,15 @@ def test_inventory_normalizes_runtime_evidence_without_reading_env_or_network_se
     volumes = {volume["name"]: volume for volume in inventory["docker"]["volumes"]}
     assert volumes["fixture-binary"]["size_bytes"] == 1_610_612_736
     assert volumes["fixture-empty"]["size_bytes"] == 0
+    assert volumes["fixture-data"]["links"] == 1
+    assert volumes["fixture-binary"]["links"] == 0
+    assert volumes["fixture-unparseable"]["links"] is None
     assert container["resource_usage"]["cpu_percent"] == 1.25
     assert container["resource_usage"]["memory_used_bytes"] == 24 * 1024 * 1024
     assert container["repo_digests"] == [IMAGE_DIGEST]
-    assert inventory["docker"]["host_timers"]["units"][0]["unit"] == "backup.timer"
+    assert inventory["docker"]["collector_host_timers"]["host_scope"] == "collector"
+    assert inventory["docker"]["collector_host_timers"]["units"][0]["unit"] == "backup.timer"
+    assert inventory["docker"]["collector_host_timers"]["units"][1]["next"] is None
     assert inventory["reconciliation"]["decision"] == "blocked"
     assert SECRET_SENTINEL not in serialized
     assert "10.2.0.7" not in serialized

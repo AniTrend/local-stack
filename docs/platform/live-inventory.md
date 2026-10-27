@@ -18,7 +18,7 @@ Repository service facts remain pinned to [`e80a48a8b8d7d4d9732840b618e73a2f4b58
 | Container and volume counts | 34 containers total, 28 running, 22 local volumes |
 | Repository service matches | 16 of 24 Compose service definitions |
 | Other runtime containers | 18 unmatched to this repository; names are intentionally omitted |
-| Host systemd timers | 13 observed; unit names are private |
+| Collector-host systemd timers | 13 observed on the collector's host, not proof of the Docker engine host's jobs; unit names are private |
 | Tailscale daemon | `tailscaled.service` active; ACLs and device grants not inspected |
 | Doco-CD controller | `doco-cd.service` inactive; no Doco-CD container observed on this engine |
 | Portainer | Container running; deployment authority was not verified |
@@ -113,3 +113,7 @@ The automated collector uses a synthetic Docker CLI fixture in tests. The select
 The collector draft was checked again before publication on 2026-10-27 without changing the historical observations above. The inventory regression file passed 6 tests under the existing isolated platform Python environment. A new explicit `ENV=lab DOCKER_CONTEXT=default` read-only collection produced run `20261027T183959Z-fcf5c1ad`; schema validation returned `schema=valid gate=blocked`. The private JSON remains ignored. This later lab collection is not a new production inventory, does not resolve G0, and did not mutate the Docker daemon.
 
 The CI `Platform inventory validation` job runs the synthetic Docker CLI regression suite with read-only repository permissions and no cloud credentials. The real disposable-engine fixture acceptance and owner-backed live reconciliation still remain to be performed.
+
+Review repairs added direct reconciliation regressions and realistic Docker/systemd formats. The complete platform inventory suite now passes 30 tests. Running the new semantic/normalization regressions against the published pre-repair collector `a094dbf` produced 23 failures and one passing semantic control. The repaired collector rejects waived required production inputs, disallowed contexts, missing/duplicate/inconsistent container mappings, unresolved ownership, and missing confirmed database/health facts.
+
+The repaired read-only collector produced lab run `20261027T192226Z-bf4b5c69`; schema validation again returned `schema=valid gate=blocked`. Timer observations now use `collector_host_timers` with explicit collector provenance, integer-microsecond timestamps become UTC ISO 8601 strings, unavailable timestamps remain null, and Docker's numeric-string volume reference counts are preserved. Older private artifacts carrying the previous timer field must be recollected, not edited into passing evidence.

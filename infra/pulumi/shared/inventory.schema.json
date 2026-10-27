@@ -45,7 +45,7 @@
         "containers",
         "volumes",
         "volume_inventory_status",
-        "host_timers"
+        "collector_host_timers"
       ],
       "properties": {
         "context_name": { "type": "string", "minLength": 1 },
@@ -70,7 +70,7 @@
           "items": { "$ref": "#/$defs/volume" }
         },
         "volume_inventory_status": { "enum": ["collected", "unavailable"] },
-        "host_timers": { "$ref": "#/$defs/timerInventory" }
+        "collector_host_timers": { "$ref": "#/$defs/timerInventory" }
       }
     },
     "repository_services": {
@@ -241,9 +241,10 @@
     "timerInventory": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "units"],
+      "required": ["status", "host_scope", "units"],
       "properties": {
         "status": { "enum": ["collected", "not_local_linux", "unavailable"] },
+        "host_scope": { "const": "collector" },
         "units": {
           "type": "array",
           "items": {
@@ -252,8 +253,8 @@
             "required": ["unit", "next", "last", "activates"],
             "properties": {
               "unit": { "type": "string" },
-              "next": { "type": ["string", "null"] },
-              "last": { "type": ["string", "null"] },
+              "next": { "type": ["string", "null"], "format": "date-time" },
+              "last": { "type": ["string", "null"], "format": "date-time" },
               "activates": { "type": ["string", "null"] }
             }
           }
