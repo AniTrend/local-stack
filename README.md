@@ -13,6 +13,7 @@ A local development environment for the AniTrend stack, providing a complete inf
 
 The [private platform implementation plan](docs/platform/README.md) defines the proposed Pulumi, Ansible and Dokploy migration, local Docker validation gates and linked implementation phases.
 The [local lab runbook](docs/platform/local-lab.md) documents the isolated Docker startup, validation and teardown path. Current deployment instructions below remain active until each service's documented ownership handoff.
+For a clean workstation or delegated remaining work, start with the [zero-context implementation and operations runbooks](docs/platform/runbooks/README.md). They separate available tooling, unimplemented development tasks and runtime acceptance still to perform.
 
 ## Stack Components
 

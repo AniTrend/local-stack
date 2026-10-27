@@ -14,6 +14,8 @@ The goal is to provision, update, inspect and recover AniTrend's private platfor
 6. [Agent execution contract](agent-execution.md).
 7. [Primary references](sources.md) and [machine-readable work graph](work-items.json).
 
+For hands-on setup or a handoff with no prior system knowledge, use the [operator runbooks](runbooks/README.md). They cover a clean workstation, account and credential prerequisites, live inventory, trusted VM acceptance, remaining P2/P3 development, rehearsal, cutover, recovery and retirement. Their availability matrix distinguishes delivered code from acceptance that still requires an actual system.
+
 These repository documents are the source of truth for implementation. The earlier research discussion is background, not a required input. Issues record work scope and acceptance; they link to this plan and each other. Before changing a decision, update the relevant ADR and affected acceptance criteria in the same reviewed change.
 
 The plan's initial publication is a documentation PR. Implementation can branch from its documented commit while it follows the existing repository review process. Until a service's ownership handoff, the current [AGENTS.md](https://github.com/AniTrend/local-stack/blob/e80a48a8b8d7d4d9732840b618e73a2f4b58a1c3/AGENTS.md), service source files and [Swarm runbook](https://github.com/AniTrend/local-stack/blob/e80a48a8b8d7d4d9732840b618e73a2f4b58a1c3/stacks/README.md) remain authoritative for operating that service. Do not deploy unresolved generated stack files or silently apply target conventions to the old host.

@@ -76,6 +76,15 @@ The VM scenario checks populated loopback data and metadata preservation, refuse
 
 The host command writes a non-secret `manifest.json` under `.artifacts/platform/<run-id>/` and removes its temporary generated Ansible inventory and `known_hosts` file after the run. The full VM command is not part of ordinary CI and never provisions HCloud resources.
 
+## Implemented evidence record validation
+
+`make platform-evidence-validate ENV=lab TIER=docker|vm MANIFEST=FILE COMMIT=FULL_SHA` is read-only. It validates completed Docker lab v1 or VM host-baseline v1 manifests, exact environment/tier/commit, required checks, cleanup and recognizable secret markers. Host acceptance additionally requires every ordered verification step with a zero exit status and observed zero changes on the second convergence. Docker acceptance requires the completed preview/apply/no-op/update/SSH/cleanup lifecycle and consistent run/resource/image identities.
+
+The target exits nonzero for incomplete, blocked, failed, mismatched, malformed or unsupported reports. The output is scoped to `docker-lab-lifecycle` or `host-baseline`, not a G0 through G6 decision. It cannot authenticate an artifact, detect arbitrary secrets, prove current host state or validate later Dokploy/application/recovery gates. Review source fingerprints, actual execution records and content separately. See the [handoff instructions](runbooks/README.md#5-validate-an-existing-local-evidence-record).
+
+`infra/pulumi/shared/host-verify-evidence.schema.json` defines host-baseline evidence. The Docker validator reuses `platform-lab.schema.json`; neither schema replaces the issue-specific actual-system acceptance criteria.
+
+
 
 
 ## Shared schema contracts
