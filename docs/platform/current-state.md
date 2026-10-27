@@ -58,6 +58,8 @@ Required environment inputs: verified Hetzner project/location, target architect
 
 Raw docker inspect, process environments, APISIX consumer exports and database data can contain secrets. Store them only in restricted evidence storage. Commit sanitized facts and opaque evidence references, never raw dumps.
 
+The sanitized runtime observation and unresolved migration gate are recorded in [live-inventory.md](live-inventory.md). The selected Docker engine is a source-host candidate, not a confirmed production identity; repository facts above remain pinned to the baseline commit.
+
 ## Historical references
 
 Closed issues [#475](https://github.com/AniTrend/local-stack/issues/475), [#500](https://github.com/AniTrend/local-stack/issues/500), [#503](https://github.com/AniTrend/local-stack/issues/503), [#504](https://github.com/AniTrend/local-stack/issues/504), [#505](https://github.com/AniTrend/local-stack/issues/505), [#533](https://github.com/AniTrend/local-stack/issues/533), [#534](https://github.com/AniTrend/local-stack/issues/534), [#535](https://github.com/AniTrend/local-stack/issues/535), [#536](https://github.com/AniTrend/local-stack/issues/536) and [#546](https://github.com/AniTrend/local-stack/issues/546) explain earlier Unleash, Swarm, rendering and deployment decisions. Reuse working code and tests; confirm current behaviour before duplicating or reviving old work.

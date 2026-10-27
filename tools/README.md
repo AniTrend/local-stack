@@ -41,3 +41,22 @@ docker stack deploy -c .rendered/docker-compose.infrastructure.rendered.yml infr
 
 - This is a preprocessing step; paths remain relative to the original file location.
 - It does not evaluate command substitutions or complex expressions, only variable substitution.
+
+## Platform inventory
+
+Use the read-only collector for a selected Docker context:
+
+```sh
+make platform-inventory ENV=legacy
+make platform-inventory-validate ENV=legacy
+```
+
+`ENV` is required. `lab` collection rejects remote Docker endpoints. The collector never runs `docker exec`, reads `.env` contents, or emits container environment values. It stores a normalized machine report under the ignored `.artifacts/platform/<run-id>/` directory with owner-only file permissions. The report includes Docker image, port, network, mount, disk, timer, and resource metadata, so keep it local or in approved restricted evidence storage.
+
+Schema validity is separate from migration readiness. Validation prints the reconciliation gate state; `gate=blocked` is not a completed inventory or a production pass. The public report belongs in `docs/platform/live-inventory.md` and must omit private host paths, addresses, unrelated workload names, and raw runtime exports.
+
+The versioned inventory and environment intent schemas live in `infra/pulumi/shared/`. The environment contract uses typed values, explicit resolution status, and opaque evidence references; credential fields accept reference names only.
+
+The pass-reconciliation check requires all current production environment inputs to be confirmed with concrete values and evidence references; this contract defines no automatic `not_applicable` exemption. It also binds the observed context to its approved allowlist and cross-checks every observed container against its service or unmatched-owner record. Confirmed health and database facts need their supporting evidence, version/topology and data paths.
+
+`docker.collector_host_timers` explicitly describes the collector workstation, not the Docker engine host. A local Unix socket can lead to a Docker Desktop VM. The source host's actual job/writer map therefore still needs independent confirmation. Timestamp fields are UTC ISO 8601 or null for unavailable values. Recollect pre-repair artifacts rather than renaming their old timer field; schema validity and actual G0 acceptance remain separate.
