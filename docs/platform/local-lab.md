@@ -67,10 +67,16 @@ The lab uses a separate user-defined bridge, one scratch volume, and a disposabl
 
 The image is pinned by digest and selected for `linux/amd64` or `linux/arm64`. The report records `native` or `emulated` relative to the host and Docker daemon architectures. The image uses `keepLocally: true`, so teardown intentionally retains the content-addressed image cache; it does not prune images.
 
+## Ansible host validation
+
+Run `make platform-ansible-test ENV=lab` with the same explicit local context and allowlist. It builds a digest-pinned Ubuntu 24.04 fixture using host networking only during image build, then runs Molecule on a separate default-bridge container with no published ports. The scenario verifies real baseline convergence, zero-change idempotence, injected drift correction and cleanup. It owns only its named container; the local fixture image remains cached.
+
+`make platform-host-verify ENV=lab TIER=vm` is separate from the Docker lab. It requires an externally provided disposable Ubuntu 24.04 VM, signed host trust, bootstrap and automation SSH keys, and scoped Tailscale credentials. The runner proves the new automation account can reconnect before firewall changes, verifies storage and Docker firewall behavior, reboots the VM, then checks mounts/access and a second converge. It does not provision HCloud resources. See [the validation contract](validation.md#ansible-execution-and-prerequisites) for exact inputs and blocked-gate behavior.
+
 ## Local evidence and separate tiers
 
 The sanitized run manifest is retained at `.artifacts/platform/lab/<run-id>/manifest.json`. It records the source commit, Git worktree cleanliness for context, and a SHA-256 fingerprint of tracked lab inputs and untracked lab source files. Resume compares the commit and input fingerprint, not the cleanliness flag; unrelated files outside the input set do not block resume. It also records tool versions, host/daemon/image architecture, digest, resource names, no-op/update/SSH results, and cleanup status. It excludes the local Docker socket path, passphrase, and SSH private key. Successful teardown removes the private key, passphrase, local backend, and active-run pointer; the manifest remains ignored by Git.
 
 `infra/pulumi/shared/platform-lab.schema.json` defines the lab output and run-manifest schemas. The CLI validates Pulumi outputs and each manifest write against this contract.
 
-PR CI runs offline doctor fixtures and Pulumi mock tests and uploads their non-secret reports. Those tests are separate from this actual Docker T1 run. The full Linux VM tier for systemd, host networking, and Dokploy is separate; this local lab does not mark VM or production gates passed.
+PR CI runs offline doctor fixtures and Pulumi mock tests, plus the Docker-backed Ansible Molecule T1 scenario, and uploads non-secret reports. No job provisions HCloud resources. The full Linux VM tier for systemd, host networking, Tailscale, storage, Docker-compatible firewall rules and reboot is separate; this local lab does not mark VM or production gates passed.

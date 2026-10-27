@@ -4,3 +4,4 @@ molecule-plugins[docker]==26.10.12
 pytest==8.4.2
 PyYAML==6.0.3
 jsonschema==4.25.1
+cryptography==50.0.2

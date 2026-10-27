@@ -1,0 +1,12 @@
+---
+platform_tailscale_version: 1.104.2
+platform_tailscale_checksums:
+  amd64: 512f613ed7d04fc7282f7dc5bd76aa105aae28168fbb9357eb749ebcbc29f0ae
+  arm64: 5776aaa901b5ef1916e66be5bb54b9f481cd399c9c28db123a8cab620efa237b
+platform_tailscale_auth_key: ""
+platform_tailscale_tag: ""
+platform_tailscale_hostname: >-
+  {{ platform_host_identity_ref
+     | regex_replace('[^A-Za-z0-9-]', '-')
+     | lower
+     | truncate(63, true, '') }}

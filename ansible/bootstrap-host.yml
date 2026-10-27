@@ -1,0 +1,9 @@
+---
+- name: Bootstrap the separate Ansible automation account
+  hosts: platform_target
+  become: true
+  gather_facts: true
+  vars:
+    platform_automation_public_key: "{{ lookup('env', 'PLATFORM_VM_AUTOMATION_PUBLIC_KEY') }}"
+  roles:
+    - platform_host_baseline

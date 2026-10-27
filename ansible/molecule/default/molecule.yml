@@ -1,0 +1,37 @@
+---
+driver:
+  name: docker
+platforms:
+  - name: "${PLATFORM_MOLECULE_INSTANCE_NAME}"
+    image: anitrend/platform-ansible:ubuntu-24.04
+    labels:
+      platform-owner: anitrend-platform-ansible-test
+      platform-run-id: "${PLATFORM_MOLECULE_RUN_ID}"
+    pre_build_image: true
+    pull: false
+    command: sleep infinity
+    privileged: false
+provisioner:
+  name: ansible
+  config_options:
+    defaults:
+      host_key_checking: true
+      interpreter_python: auto_silent
+  playbooks:
+    converge: converge.yml
+    side_effect: side_effect.yml
+    verify: verify.yml
+verifier:
+  name: ansible
+scenario:
+  test_sequence:
+    - destroy
+    - syntax
+    - create
+    - converge
+    - idempotence
+    - side_effect
+    - converge
+    - idempotence
+    - verify
+    - destroy

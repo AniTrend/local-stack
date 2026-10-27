@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AniTrend host baseline verification evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run_id", "environment", "tier", "result", "tested_commit", "inventory", "steps", "cleanup_status", "tool_versions"],
+  "properties": {
+    "schema_version": {"const": "anitrend.platform.host-verify.v1"},
+    "run_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"},
+    "environment": {"const": "lab"},
+    "tier": {"const": "vm"},
+    "result": {"enum": ["pass", "fail", "blocked", "skipped"]},
+    "tested_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "inventory": {"type": "object"},
+    "steps": {
+      "type": "array",
+      "maxItems": 9,
+      "allOf": [{"items": {"$ref": "#/$defs/step"}}],
+      "prefixItems": [
+        {"properties": {"name": {"const": "validate_inventory_and_trust"}}},
+        {"properties": {"name": {"const": "bootstrap_automation_account"}}},
+        {"properties": {"name": {"const": "automation_ssh_reconnect_before_firewall"}}},
+        {"properties": {"name": {"const": "storage_device_identity_safety_checks"}}},
+        {"properties": {"name": {"const": "fresh_host_convergence"}}},
+        {"properties": {"name": {"const": "automation_ssh_reconnect_after_firewall"}}},
+        {"properties": {"name": {"const": "storage_safety_and_create_only_checks"}}},
+        {"properties": {"name": {"const": "systemd_firewall_tailscale_mount_reboot_verification"}}},
+        {"properties": {"name": {"const": "second_host_convergence"}}}
+      ]
+    },
+    "cleanup_status": {"enum": ["pending", "pass", "fail", "failed", "blocked", "skipped"]},
+    "tool_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python", "ansible-core", "molecule", "molecule-plugins", "collections"],
+      "properties": {
+        "python": {"$ref": "#/$defs/version"},
+        "ansible-core": {"$ref": "#/$defs/version"},
+        "molecule": {"$ref": "#/$defs/version"},
+        "molecule-plugins": {"$ref": "#/$defs/version"},
+        "tailscale": {"$ref": "#/$defs/version"},
+        "docker-client": {"type": "string", "pattern": "^[0-9][A-Za-z0-9.+-]*$"},
+        "collections": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["ansible.posix", "community.docker", "community.general", "community.library_inventory_filtering_v1"],
+          "properties": {
+            "ansible.posix": {"$ref": "#/$defs/version"},
+            "community.docker": {"$ref": "#/$defs/version"},
+            "community.general": {"$ref": "#/$defs/version"},
+            "community.library_inventory_filtering_v1": {"$ref": "#/$defs/version"}
+          }
+        }
+      }
+    },
+    "error": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"result": {"const": "pass"}}},
+      "then": {
+        "not": {"required": ["error"]},
+        "properties": {
+          "inventory": {"$ref": "#/$defs/inventory"},
+          "cleanup_status": {"const": "pass"},
+          "tool_versions": {"required": ["tailscale", "docker-client"]},
+          "steps": {
+            "minItems": 9,
+            "allOf": [{"items": {
+              "not": {"required": ["error"]},
+              "properties": {"state": {"const": "pass"}, "exit_code": {"const": 0}}
+            }}],
+            "prefixItems": [{}, {}, {}, {}, {}, {}, {}, {}, {
+              "required": ["changed_counts"],
+              "properties": {"changed_counts": {"minItems": 1, "items": {"const": 0, "type": "integer"}}}
+            }]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "command", "exit_code", "state"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "command": {"type": "string", "minLength": 1},
+        "exit_code": {"type": "integer"},
+        "state": {"enum": ["pass", "fail", "blocked", "skipped"]},
+        "changed_counts": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "error": {"type": "string", "minLength": 1}
+      }
+    },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "provider", "stack_identity", "host_identity_ref", "architecture", "os_image", "image_ref", "native_execution", "volume_count", "create_only_format"],
+      "properties": {
+        "schema_version": {"const": "anitrend.platform.pulumi-inventory.lab-v1"},
+        "provider": {"const": "external-vm"},
+        "stack_identity": {"type": "string", "minLength": 1},
+        "host_identity_ref": {"type": "string", "minLength": 1},
+        "architecture": {"enum": ["amd64", "arm64"]},
+        "os_image": {"type": "string", "minLength": 1},
+        "image_ref": {"type": "string", "minLength": 1},
+        "native_execution": {"const": true},
+        "volume_count": {"type": "integer", "minimum": 1},
+        "create_only_format": {"type": "boolean"}
+      }
+    }
+  }
+}

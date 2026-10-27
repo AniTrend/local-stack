@@ -52,6 +52,20 @@ test("rejects raw SSH key material, noncanonical CIDRs, and unsafe mount paths",
   assert.throws(() => parseIntent(unsafeMount), /mount_path/i);
 });
 
+test("rejects system-critical and nested host mount paths", () => {
+  const systemMount = validIntent();
+  systemMount.volumes[0].mount_path = "/etc";
+  assert.throws(() => parseIntent(systemMount), /mount_path/i);
+
+  const nestedMount = validIntent();
+  nestedMount.volumes.push({
+    ...nestedMount.volumes[0],
+    id_ref: "second-volume",
+    mount_path: nestedMount.volumes[0].mount_path + "/nested",
+  });
+  assert.throws(() => parseIntent(nestedMount), /overlapping.*mount path/i);
+});
+
 test("rejects public SSH and non-web application ingress", () => {
   const publicSsh = validIntent();
   publicSsh.public_routes[0].port = 22;

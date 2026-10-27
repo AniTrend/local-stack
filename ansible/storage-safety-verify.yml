@@ -1,0 +1,55 @@
+---
+- name: Verify populated and create-only loopback storage safely
+  hosts: platform_target
+  become: true
+  gather_facts: false
+  vars:
+    platform_storage_safety_run_id: "{{ lookup('env', 'PLATFORM_RUN_ID') }}"
+    platform_storage_safety_directory: "/var/tmp/anitrend-platform-storage-test-{{ platform_storage_safety_run_id }}"
+    platform_storage_existing_image: "{{ platform_storage_safety_directory }}/populated.img"
+    platform_storage_empty_image: "{{ platform_storage_safety_directory }}/empty.img"
+    platform_storage_existing_link: "/dev/disk/by-id/anitrend-populated-{{ platform_storage_safety_run_id }}"
+    platform_storage_empty_link: "/dev/disk/by-id/anitrend-empty-{{ platform_storage_safety_run_id }}"
+    platform_storage_existing_mount: "/srv/anitrend/storage-existing-{{ platform_storage_safety_run_id }}"
+    platform_storage_empty_mount: "/srv/anitrend/storage-empty-{{ platform_storage_safety_run_id }}"
+  tasks:
+    - name: Validate the unique disposable storage-safety run identifier
+      ansible.builtin.assert:
+        that:
+          - platform_storage_safety_run_id is match('^[a-z0-9][a-z0-9-]{0,31}$')
+        fail_msg: "A unique storage-safety run identifier is required before creating loop devices."
+
+    - name: Execute isolated loopback safety assertions
+      block:
+        - name: Run populated and create-only storage assertions
+          ansible.builtin.include_tasks: storage-safety-tasks.yml
+      always:
+        - name: Remove the populated test mount entry
+          ansible.posix.mount:
+            path: "{{ platform_storage_existing_mount }}"
+            state: absent
+
+        - name: Remove the create-only test mount entry
+          ansible.posix.mount:
+            path: "{{ platform_storage_empty_mount }}"
+            state: absent
+
+        - name: Detach disposable loop devices
+          ansible.builtin.command:
+            argv:
+              - losetup
+              - --detach
+              - "{{ item }}"
+          loop:
+            - "{{ platform_storage_existing_loop.stdout | default('') }}"
+            - "{{ platform_storage_empty_loop.stdout | default('') }}"
+          when: item | length > 0
+
+        - name: Remove disposable test identifiers and image files
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ platform_storage_existing_link }}"
+            - "{{ platform_storage_empty_link }}"
+            - "{{ platform_storage_safety_directory }}"

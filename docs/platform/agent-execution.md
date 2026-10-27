@@ -10,6 +10,8 @@ Read AGENTS.md, this plan's README, ADR, current-state snapshot, validation cont
 
 Use work-items.json for the dependency graph and issue URLs. Query GitHub for current issue/PR state and read prerequisite completion evidence. Never assume an issue is implemented just because it is closed. Start only work whose prerequisites are complete, except that independent P0 discovery and P1 lab work can proceed separately. The documentation PR is a versioned starting point, not an additional permission checkpoint for authorized implementation.
 
+Explicitly authorized development may build on unmerged prerequisite PRs with synthetic inputs while VM or cloud access is unavailable. Record the stack base and the deferred acceptance in the PR and [operator handoff](runbooks/README.md). This does not satisfy an operational gate, authorize cloud spend, or waive required reviews. Keep the full migration goal and its remaining acceptance criteria open.
+
 Use an isolated branch/worktree for each coherent implementation change. Refresh dev and record its SHA. Compare newer source with the immutable planning baseline; update affected assumptions through review. Do not reset or overwrite unrelated user/agent changes.
 
 For each issue: state the candidate goal and relevant gate; implement the owned scope; run the specified meaningful assertions; update canonical docs and environment schemas; submit a focused PR linking the issue and evidence. Preserve current runtime until its explicit ownership handoff. Do not merge or promote outside existing authorization/repository policy.

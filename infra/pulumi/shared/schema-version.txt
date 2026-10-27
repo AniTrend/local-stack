@@ -1,1 +1,2 @@
 anitrend.platform.pulumi-inventory.v1
+anitrend.platform.pulumi-inventory.lab-v1

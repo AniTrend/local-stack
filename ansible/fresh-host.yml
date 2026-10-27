@@ -1,0 +1,25 @@
+---
+- name: Apply the OS-owned fresh-host baseline
+  hosts: platform_target
+  become: true
+  gather_facts: true
+  vars:
+    platform_automation_public_key: "{{ lookup('env', 'PLATFORM_VM_AUTOMATION_PUBLIC_KEY') }}"
+    platform_storage_allow_create_only_format: >-
+      {{ lookup('env', 'PLATFORM_VM_ALLOW_CREATE_ONLY_FORMAT')
+         == 'I_UNDERSTAND_THIS_FORMATS_ONLY_DECLARED_EMPTY_VOLUMES' }}
+    platform_tailscale_auth_key: "{{ lookup('env', 'PLATFORM_TAILSCALE_AUTH_KEY') }}"
+    platform_tailscale_tag: "{{ lookup('env', 'PLATFORM_TAILSCALE_TAG') }}"
+  pre_tasks:
+    - name: Require independently verified recovery access before host mutation
+      ansible.builtin.assert:
+        that:
+          - platform_firewall_recovery_access_verified | default(false) | bool
+        fail_msg: >-
+          Run the bootstrap play and verify the automation user's SSH reconnect
+          before fresh-host configuration.
+  roles:
+    - platform_host_baseline
+    - platform_host_storage
+    - platform_tailscale
+    - platform_host_firewall

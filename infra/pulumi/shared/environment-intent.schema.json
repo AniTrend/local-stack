@@ -88,7 +88,7 @@
         "properties": {
           "id_ref": { "type": "string", "minLength": 1 },
           "size_gb": { "type": "integer", "minimum": 10, "maximum": 10000 },
-          "mount_path": { "type": "string", "pattern": "^/[^\\s]*$" },
+          "mount_path": { "type": "string", "pattern": "^/(?:srv|mnt|var/lib)/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$" },
           "data_classification": { "type": "string", "minLength": 1 },
           "protected": { "type": "boolean" }
         }

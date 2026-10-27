@@ -1,0 +1,338 @@
+---
+- name: Verify the complete Linux VM host baseline
+  hosts: platform_target
+  become: true
+  gather_facts: true
+  vars_files:
+    - roles/platform_tailscale/defaults/main.yml
+  tasks:
+    - name: Require the supported Ubuntu systemd guest
+      ansible.builtin.assert:
+        that:
+          - ansible_facts["distribution"] == "Ubuntu"
+          - ansible_facts["distribution_version"] == "24.04"
+          - ansible_facts["service_mgr"] == "systemd"
+        fail_msg: "The full VM scenario requires Ubuntu 24.04 with systemd."
+
+    - name: Check the automation user's SSH reconnect
+      ansible.builtin.ping:
+
+    - name: Check Tailscale service state
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - tailscaled.service
+      register: platform_tailscale_service_state
+      changed_when: false
+
+    - name: Require Tailscale to be active
+      ansible.builtin.assert:
+        that:
+          - platform_tailscale_service_state.stdout == "active"
+
+    - name: Check the Tailscale control-plane state without exposing peer details
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/tailscale
+          - status
+          - --json
+      register: platform_tailscale_state
+      changed_when: false
+      no_log: true
+      diff: false
+
+    - name: Require an authenticated Tailscale node
+      ansible.builtin.assert:
+        that:
+          - (platform_tailscale_state.stdout | from_json).BackendState == "Running"
+      no_log: true
+      diff: false
+
+    - name: Require systemd-timesyncd to be active
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - systemd-timesyncd.service
+      register: platform_timesync_service_state
+      changed_when: false
+
+    - name: Verify synchronized system time service
+      ansible.builtin.assert:
+        that:
+          - platform_timesync_service_state.stdout == "active"
+
+    - name: Read the installed journal size policy
+      ansible.builtin.slurp:
+        src: /etc/systemd/journald.conf.d/60-anitrend-platform.conf
+      register: platform_journal_policy
+
+    - name: Verify bounded journald storage
+      ansible.builtin.assert:
+        that:
+          - "'SystemMaxUse=500M' in (platform_journal_policy.content | b64decode)"
+          - "'RuntimeMaxUse=100M' in (platform_journal_policy.content | b64decode)"
+
+    - name: Read the installed Tailscale client version
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/tailscale
+          - version
+      register: platform_tailscale_version_info
+      changed_when: false
+
+    - name: Require the pinned Tailscale client version
+      ansible.builtin.assert:
+        that:
+          - (platform_tailscale_version_info.stdout_lines | first) == platform_tailscale_version
+
+    - name: Report the observed Tailscale version
+      ansible.builtin.debug:
+        msg: "platform-tailscale-version={{ platform_tailscale_version_info.stdout_lines | first }}"
+
+    - name: Check the persistent host firewall service
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - anitrend-platform-firewall.service
+      register: platform_host_firewall_state
+      changed_when: false
+
+    - name: Require the host firewall service to be active
+      ansible.builtin.assert:
+        that:
+          - platform_host_firewall_state.stdout == "active"
+
+    - name: Verify host INPUT firewall rules are converged
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - /usr/local/libexec/anitrend-platform-firewall.py
+          - input
+          - --config
+          - /etc/anitrend-platform/firewall.json
+      register: platform_input_firewall_check
+      changed_when: "'platform-firewall=changed' in platform_input_firewall_check.stdout"
+
+    - name: Require host INPUT firewall rules to have no drift
+      ansible.builtin.assert:
+        that:
+          - not platform_input_firewall_check.changed
+
+    - name: Require the Docker daemon for DOCKER-USER verification
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - docker.service
+      register: platform_docker_state
+      changed_when: false
+
+    - name: Read the Docker CLI version
+      ansible.builtin.command:
+        argv:
+          - docker
+          - --version
+      register: platform_docker_cli_version
+      changed_when: false
+
+    - name: Verify and report the observed Docker CLI version
+      ansible.builtin.assert:
+        that:
+          - platform_docker_cli_version.stdout.split() | length >= 3
+          - platform_docker_cli_version.stdout.split()[0:2] == ["Docker", "version"]
+
+    - name: Report the observed Docker version
+      ansible.builtin.debug:
+        msg: "platform-docker-version={{ platform_docker_cli_version.stdout.split()[2].rstrip(',') }}"
+
+    - name: Verify Docker forwarding firewall rules are converged
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - /usr/local/libexec/anitrend-platform-firewall.py
+          - docker
+          - --config
+          - /etc/anitrend-platform/firewall.json
+      register: platform_docker_firewall_check
+      changed_when: "'platform-firewall=changed' in platform_docker_firewall_check.stdout"
+
+    - name: Read the installed firewall policy for family validation
+      ansible.builtin.slurp:
+        src: /etc/anitrend-platform/firewall.json
+      register: platform_firewall_policy_raw
+
+    - name: Decode the installed firewall policy
+      ansible.builtin.set_fact:
+        platform_firewall_runtime_config: "{{ platform_firewall_policy_raw.content | b64decode | from_json }}"
+
+    - name: Require Docker IPv6 filtering when host IPv6 is enabled
+      ansible.builtin.assert:
+        that:
+          - >-
+            not (platform_firewall_runtime_config.ipv6_enabled | bool) or
+            'platform-firewall-docker-ipv6=unavailable' not in platform_docker_firewall_check.stdout
+        fail_msg: "Docker IPv6 filtering is unavailable while host IPv6 filtering is enabled."
+
+    - name: Require Docker forwarding rules to have no drift
+      ansible.builtin.assert:
+        that:
+          - not platform_docker_firewall_check.changed
+
+    - name: Remove only the tailnet SSH rule to introduce fail-closed firewall drift
+      ansible.builtin.command:
+        argv:
+          - iptables
+          - -w
+          - -t
+          - filter
+          - -D
+          - ANITREND-IN
+          - -i
+          - tailscale0
+          - -p
+          - tcp
+          - --dport
+          - "22"
+          - -j
+          - ACCEPT
+      changed_when: true
+
+    - name: Repair the detected host firewall drift
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - /usr/local/libexec/anitrend-platform-firewall.py
+          - input
+          - --config
+          - /etc/anitrend-platform/firewall.json
+      register: platform_firewall_drift_repair
+      changed_when: "'platform-firewall=changed' in platform_firewall_drift_repair.stdout"
+
+    - name: Require firewall drift to be restored
+      ansible.builtin.assert:
+        that:
+          - platform_firewall_drift_repair.changed
+
+    - name: Verify the repaired host firewall is idempotent
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - /usr/local/libexec/anitrend-platform-firewall.py
+          - input
+          - --config
+          - /etc/anitrend-platform/firewall.json
+      register: platform_firewall_repaired_check
+      changed_when: "'platform-firewall=changed' in platform_firewall_repaired_check.stdout"
+
+    - name: Require the repaired host firewall to remain stable
+      ansible.builtin.assert:
+        that:
+          - not platform_firewall_repaired_check.changed
+
+    - name: Verify each declared filesystem is mounted from its intended device
+      ansible.builtin.include_tasks: vm-verify-volume.yml
+      loop: "{{ platform_volumes }}"
+      loop_control:
+        loop_var: platform_volume
+        label: "{{ platform_volume.reference }}"
+
+    - name: Reboot the disposable VM and require SSH recovery
+      ansible.builtin.reboot:
+        connect_timeout: 10
+        reboot_timeout: 900
+        post_reboot_delay: 10
+
+    - name: Confirm SSH reconnection after reboot
+      ansible.builtin.ping:
+
+    - name: Check required systemd services after reboot
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - "{{ item }}"
+      loop:
+        - systemd-timesyncd.service
+        - tailscaled.service
+        - anitrend-platform-firewall.service
+        - docker.service
+      register: platform_rebooted_services
+      changed_when: false
+      failed_when: false
+
+    - name: Require all host services to be active after reboot
+      ansible.builtin.assert:
+        that:
+          - item.rc == 0
+          - item.stdout == "active"
+      loop: "{{ platform_rebooted_services.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Reverify host INPUT firewall after reboot
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - /usr/local/libexec/anitrend-platform-firewall.py
+          - input
+          - --config
+          - /etc/anitrend-platform/firewall.json
+      register: platform_rebooted_input_firewall
+      changed_when: "'platform-firewall=changed' in platform_rebooted_input_firewall.stdout"
+
+    - name: Require INPUT firewall persistence after reboot
+      ansible.builtin.assert:
+        that:
+          - not platform_rebooted_input_firewall.changed
+
+    - name: Reverify Docker forwarding firewall after reboot
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/python3
+          - /usr/local/libexec/anitrend-platform-firewall.py
+          - docker
+          - --config
+          - /etc/anitrend-platform/firewall.json
+      register: platform_rebooted_docker_firewall
+      changed_when: "'platform-firewall=changed' in platform_rebooted_docker_firewall.stdout"
+
+    - name: Require Docker IPv6 hook persistence after reboot when host IPv6 is enabled
+      ansible.builtin.assert:
+        that:
+          - >-
+            not (platform_firewall_runtime_config.ipv6_enabled | bool) or
+            'platform-firewall-docker-ipv6=unavailable' not in platform_rebooted_docker_firewall.stdout
+        fail_msg: "Docker IPv6 filtering became unavailable after reboot."
+
+    - name: Require Docker firewall persistence after reboot
+      ansible.builtin.assert:
+        that:
+          - not platform_rebooted_docker_firewall.changed
+
+    - name: Reverify mounted filesystems after reboot
+      ansible.builtin.include_tasks: vm-verify-volume.yml
+      loop: "{{ platform_volumes }}"
+      loop_control:
+        loop_var: platform_volume
+        label: "{{ platform_volume.reference }}"
+
+    - name: Reverify Tailscale after reboot
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/tailscale
+          - status
+          - --json
+      register: platform_rebooted_tailscale_state
+      changed_when: false
+      no_log: true
+      diff: false
+
+    - name: Require Tailscale to remain authenticated after reboot
+      ansible.builtin.assert:
+        that:
+          - (platform_rebooted_tailscale_state.stdout | from_json).BackendState == "Running"
+      no_log: true
+      diff: false

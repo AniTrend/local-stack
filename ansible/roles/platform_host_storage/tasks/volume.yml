@@ -1,0 +1,190 @@
+---
+- name: Validate declared volume identity and policy
+  ansible.builtin.assert:
+    that:
+      - platform_volume.linux_device is match('^/dev/disk/by-id/[^\\s]+$')
+      - platform_volume.linux_device.split('/') | length == 5
+      - platform_volume.linux_device.split('/')[-1] not in [".", ".."]
+      - platform_volume.filesystem == "ext4"
+      - platform_volume.format_policy in ["never", "create-only"]
+      - platform_volume.mount_path is match('^/(srv|mnt|var/lib)/[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*$')
+      - platform_volume.format_policy != "create-only" or platform_volume.data_classification == "empty"
+    fail_msg: "The declared volume is not a safe stable-identifier storage entry."
+
+- name: Inspect stable volume device
+  ansible.builtin.stat:
+    path: "{{ platform_volume.linux_device }}"
+    follow: true
+  register: platform_volume_device_link
+
+- name: Require an existing stable block device
+  ansible.builtin.assert:
+    that:
+      - platform_volume_device_link.stat.exists
+      - platform_volume_device_link.stat.isblk
+    fail_msg: "Refusing storage changes unless the stable volume identifier resolves to a block device."
+
+- name: Resolve stable volume device
+  ansible.builtin.command:
+    argv:
+      - readlink
+      - -e
+      - --
+      - "{{ platform_volume.linux_device }}"
+  register: platform_volume_device
+  changed_when: false
+
+- name: Inspect resolved volume device
+  ansible.builtin.stat:
+    path: "{{ platform_volume_device.stdout }}"
+    follow: true
+  register: platform_volume_device_real
+
+- name: Require the resolved volume to remain a block device
+  ansible.builtin.assert:
+    that:
+      - platform_volume_device_real.stat.exists
+      - platform_volume_device_real.stat.isblk
+      - platform_volume_device.stdout.startswith("/dev/")
+    fail_msg: "Refusing storage changes when the stable volume identifier resolves outside /dev."
+
+- name: Read resolved volume major and minor numbers
+  ansible.builtin.command:
+    argv:
+      - lsblk
+      - --nodeps
+      - --noheadings
+      - --output
+      - MAJ:MIN
+      - "{{ platform_volume_device.stdout }}"
+  register: platform_volume_major_minor
+  changed_when: false
+
+
+- name: Inspect an existing mount at the intended path
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - MAJ:MIN
+      - --mountpoint
+      - "{{ platform_volume.mount_path }}"
+  register: platform_existing_mount
+  changed_when: false
+  failed_when: platform_existing_mount.rc not in [0, 1]
+
+- name: Refuse to replace another device at the intended mount path
+  ansible.builtin.assert:
+    that:
+      - platform_existing_mount.stdout | trim == platform_volume_major_minor.stdout | trim
+    fail_msg: "Refusing to replace a different filesystem already mounted at the declared path."
+  when: platform_existing_mount.rc == 0
+
+- name: Detect whether the volume is mounted at another path
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - TARGET
+      - --source
+      - "{{ platform_volume.linux_device }}"
+  register: platform_existing_volume_mounts
+  changed_when: false
+  failed_when: platform_existing_volume_mounts.rc not in [0, 1]
+
+- name: Refuse to use a volume mounted outside its declared path
+  ansible.builtin.assert:
+    that:
+      - platform_existing_volume_mounts.stdout_lines | difference([platform_volume.mount_path]) | length == 0
+    fail_msg: "Refusing a volume already mounted outside its declared path."
+  when: platform_existing_volume_mounts.rc == 0
+- name: Create the declared mount directory
+  ansible.builtin.file:
+    path: "{{ platform_volume.mount_path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+  when: platform_existing_mount.rc == 1
+
+- name: Detect an existing filesystem signature
+  ansible.builtin.command:
+    argv:
+      - blkid
+      - --output
+      - value
+      - --match-tag
+      - TYPE
+      - --
+      - "{{ platform_volume.linux_device }}"
+  register: platform_volume_filesystem
+  changed_when: false
+  failed_when: platform_volume_filesystem.rc not in [0, 2]
+
+- name: Inspect all recognized signatures before any formatting
+  ansible.builtin.command:
+    argv:
+      - wipefs
+      - --no-act
+      - --json
+      - --
+      - "{{ platform_volume.linux_device }}"
+  register: platform_volume_signatures
+  changed_when: false
+
+- name: Refuse an unexpected existing filesystem
+  ansible.builtin.assert:
+    that:
+      - platform_volume_filesystem.rc == 2 or (platform_volume_filesystem.stdout | trim) == platform_volume.filesystem
+    fail_msg: "Refusing to overwrite a volume with an unexpected filesystem type."
+
+- name: Require explicit create-only authorization for an unformatted volume
+  ansible.builtin.assert:
+    that:
+      - platform_volume.format_policy == "create-only"
+      - platform_volume.data_classification == "empty"
+      - platform_storage_allow_create_only_format | bool
+      - (platform_volume_signatures.stdout | from_json).signatures | default([]) | length == 0
+    fail_msg: >-
+      Refusing to format a volume without explicit empty-device create-only
+      authorization and no recognized signatures.
+  when: platform_volume_filesystem.rc == 2
+
+- name: Create the explicitly authorized filesystem without force
+  community.general.filesystem:
+    dev: "{{ platform_volume.linux_device }}"
+    fstype: "{{ platform_volume.filesystem }}"
+    force: false
+    state: present
+  when: platform_volume_filesystem.rc == 2
+
+- name: Mount the declared filesystem and persist it through reboot
+  ansible.posix.mount:
+    src: "{{ platform_volume.linux_device }}"
+    path: "{{ platform_volume.mount_path }}"
+    fstype: "{{ platform_volume.filesystem }}"
+    opts: defaults,nofail
+    dump: "0"
+    passno: "2"
+    backup: true
+    state: mounted
+
+- name: Verify the mounted volume major and minor numbers
+  ansible.builtin.command:
+    argv:
+      - findmnt
+      - --noheadings
+      - --output
+      - MAJ:MIN
+      - --mountpoint
+      - "{{ platform_volume.mount_path }}"
+  register: platform_mounted_major_minor
+  changed_when: false
+
+- name: Assert the intended block device is mounted
+  ansible.builtin.assert:
+    that:
+      - platform_mounted_major_minor.stdout | trim == platform_volume_major_minor.stdout | trim
+    fail_msg: "The mounted filesystem does not match the declared stable volume device."

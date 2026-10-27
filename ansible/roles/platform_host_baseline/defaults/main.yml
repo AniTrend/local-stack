@@ -1,0 +1,17 @@
+---
+platform_automation_user: platform-automation
+platform_automation_public_key: ""
+platform_host_baseline_packages:
+  - ca-certificates
+  - python3
+  - sudo
+  - systemd-timesyncd
+  - tar
+  - tzdata
+  - util-linux
+  - e2fsprogs
+platform_host_timezone: Etc/UTC
+platform_host_directories:
+  - /srv/anitrend
+  - /var/lib/anitrend
+  - /var/backups/anitrend

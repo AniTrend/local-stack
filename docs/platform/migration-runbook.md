@@ -2,6 +2,8 @@
 
 This is the required runbook structure. P0 supplies runtime facts; P4 rehearses the completed instructions; P5 executes a concrete manifest. Do not run production commands from unresolved examples.
 
+For step-by-step setup and assignment-ready procedures, start with the [operator runbooks](runbooks/README.md). In particular, [migration execution and handover](runbooks/migration.md) expands this safety contract with input-acquisition steps, approvals, expected evidence, abort decisions, rehearsal, soak, retirement and recovery instructions. Future command interfaces are labelled unimplemented rather than presented as executable deployments.
+
 ## Planning defaults and required inputs
 
 Use a fresh target host and keep the source. Preserve database major versions. Default engineering targets are backup RPO no worse than 24 hours and cold-restore RTO no worse than 60 minutes for durable app state; these are targets to measure, not promises. The planned quiesced cutover must lose zero acknowledged writes. P0 must set and justify any different target.

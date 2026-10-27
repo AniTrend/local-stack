@@ -1,0 +1,15 @@
+---
+- name: Validate versioned storage inventory
+  ansible.builtin.assert:
+    that:
+      - platform_volumes is sequence
+      - platform_volumes is not string
+      - platform_storage_allow_create_only_format is boolean
+    fail_msg: "Storage requires a validated versioned host inventory."
+
+- name: Converge each declared storage volume
+  ansible.builtin.include_tasks: volume.yml
+  loop: "{{ platform_volumes }}"
+  loop_control:
+    loop_var: platform_volume
+    label: "{{ platform_volume.reference }}"

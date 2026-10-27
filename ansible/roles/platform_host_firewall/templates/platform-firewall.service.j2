@@ -1,0 +1,12 @@
+[Unit]
+Description=AniTrend platform host firewall
+Wants=network-online.target tailscaled.service
+After=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/libexec/anitrend-platform-firewall.py input --config /etc/anitrend-platform/firewall.json
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
