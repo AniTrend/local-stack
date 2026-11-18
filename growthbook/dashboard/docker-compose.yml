@@ -14,7 +14,7 @@ services:
     # `yarn start:with-tracing`.
     environment:
       - TRACING_PROVIDER=opentelemetry
-    image: "growthbook/growthbook:5.1.0"
+    image: "growthbook/growthbook:5.2.1"
     volumes:
       - uploads:/usr/local/src/app/packages/back-end/uploads
     env_file: .env
